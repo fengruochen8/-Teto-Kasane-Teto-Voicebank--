@@ -19,7 +19,7 @@ xcodebuild -project TetoMelody.xcodeproj -scheme TetoMelody \
 
 ## 欢迎页插画
 
-个人构建使用[重音Teto官网配布的角色插画](https://kasaneteto.jp/illust-logo/)，原图保存在本地的 `LocalArtwork`。Xcode 读取本地的 `App/Assets.xcassets/TetoWelcomeIllustration.imageset`，资源按[角色使用条款](https://kasaneteto.jp/guideline/character.html)用于个人非商用构建。图片著作权标注为重音テト © 線／小山乃舞世／TWINDRILL。单独从 Git 获取的工程默认显示波形图标。
+个人构建使用[重音Teto官网配布的角色插画](https://kasaneteto.jp/illust-logo/)。Xcode 读取本地的 `App/Assets.xcassets/TetoWelcomeIllustration.imageset`，资源按[角色使用条款](https://kasaneteto.jp/guideline/character.html)用于个人非商用构建。图片著作权标注为重音テト © 線／小山乃舞世／TWINDRILL。从 Git 克隆后，个人构建可运行 `python3 scripts/fetch_teto_art.py`，从官网获取同一张插画、校验原图并生成本地 Xcode 资源。如果 `LocalArtwork/OfficialTetoUTAU.png` 已有官网原图，脚本会优先复用。在 macOS 使用系统的 sips 缩放，其他平台使用 Pillow。
 
 ## 使用
 
