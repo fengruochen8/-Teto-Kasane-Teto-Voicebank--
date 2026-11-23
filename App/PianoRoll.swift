@@ -1,10 +1,32 @@
 import SwiftUI
 
+enum PianoRollTool: Hashable {
+    case select
+    case draw
+}
+
+enum GridSnap: Int, Hashable, CaseIterable {
+    case sixteenth = 1
+    case eighth = 2
+    case quarter = 4
+
+    func floor(_ step: CGFloat) -> Int {
+        Int((step / CGFloat(rawValue)).rounded(.down)) * rawValue
+    }
+
+    func nearest(_ step: CGFloat) -> Int {
+        Int((step / CGFloat(rawValue)).rounded()) * rawValue
+    }
+}
+
 @MainActor
 struct PianoRoll: View {
     @ObservedObject var model: StudioModel
     let showsEntryCursor: Bool
+    let tool: PianoRollTool
+    let snap: GridSnap
     @State private var drag: NoteDrag?
+    @State private var drawing: MelodyNote?
 
     static let accent = Color(red: 0.98, green: 0.68, blue: 0.42)
     private let naturalKeys: Set<Int> = [0, 2, 4, 5, 7, 9, 11]
@@ -12,36 +34,54 @@ struct PianoRoll: View {
     var body: some View {
         GeometryReader { geometry in
             let layout = RollLayout(size: geometry.size)
-            Canvas { context, _ in
-                drawGrid(context, layout: layout)
-                drawNotes(context, layout: layout)
-                if showsEntryCursor { drawEntryCursor(context, layout: layout) }
+            TimelineView(.animation(minimumInterval: 1.0 / 30, paused: !model.isPlaying)) { _ in
+                let playback = model.playbackPosition
+                Canvas { context, _ in
+                    drawGrid(context, layout: layout)
+                    drawNotes(context, layout: layout)
+                    let transport = Double(model.transportStep)
+                    if let playback {
+                        drawCursor(context, layout: layout, step: playback, color: Self.accent, width: 2)
+                    } else if showsEntryCursor {
+                        if model.entryStep != model.transportStep {
+                            drawCursor(context, layout: layout, step: transport, color: .white.opacity(0.48), width: 1)
+                        }
+                        drawCursor(context, layout: layout, step: Double(model.entryStep), color: Self.accent, width: 1.5)
+                    } else {
+                        drawCursor(context, layout: layout, step: transport, color: Self.accent.opacity(0.72), width: 1.5)
+                    }
+                }
             }
             .background(Color(red: 0.09, green: 0.14, blue: 0.19))
             .clipShape(RoundedRectangle(cornerRadius: 14))
             .contentShape(Rectangle())
-            .gesture(DragGesture(minimumDistance: 5)
-                .onChanged { updateDrag($0, layout: layout) }
-                .onEnded { _ in commitDrag() })
-            .simultaneousGesture(SpatialTapGesture().onEnded { tap($0.location, layout: layout) })
+            .gesture(
+                DragGesture(minimumDistance: 5)
+                    .onChanged { dragChanged($0, layout: layout) }
+                    .onEnded { _ in commitDrag() }
+                    .exclusively(before: SpatialTapGesture().onEnded { tap($0.location, layout: layout) })
+            )
             .accessibilityLabel("4小节旋律网格")
-            .accessibilityHint(showsEntryCursor ? "点时间尺移动录入光标" : "点按添加音符，拖动移动音符")
+            .accessibilityHint(tool == .select ? "点选音符。点时间尺定位。" : "点空白网格添加音符。拖动设置时值。")
         }
     }
 
     private func drawGrid(_ context: GraphicsContext, layout: RollLayout) {
+        let activePitch = drag?.candidate.pitch ?? drawing?.pitch ?? model.selected?.pitch
         for pitch in MelodyProject.pitches {
             let y = layout.rowTop(pitch)
             let isNatural = naturalKeys.contains(pitch % 12)
+            let pitchSelected = pitch == activePitch
             let key = CGRect(x: 0, y: y, width: layout.keys, height: layout.row)
             let row = CGRect(x: layout.keys, y: y, width: layout.size.width - layout.keys, height: layout.row)
-            context.fill(Path(key), with: .color(isNatural ? .white.opacity(0.88) : .black.opacity(0.54)))
+            let keyColor: Color = pitchSelected ? Self.accent : isNatural ? .white.opacity(0.88) : .black.opacity(0.54)
+            context.fill(Path(key), with: .color(keyColor))
             if !isNatural { context.fill(Path(row), with: .color(.black.opacity(0.19))) }
             context.stroke(Path { line in
                 line.move(to: CGPoint(x: 0, y: y))
                 line.addLine(to: CGPoint(x: layout.size.width, y: y))
             }, with: .color(.white.opacity(pitch % 12 == 0 ? 0.29 : 0.08)), lineWidth: 0.7)
-            if isNatural, layout.row >= 11 {
+            if (isNatural || pitchSelected), layout.row >= 11 {
                 context.draw(
                     Text(MelodyProject.noteName(pitch))
                         .font(.system(size: min(11, layout.row * 0.7), weight: .medium, design: .monospaced))
@@ -55,10 +95,12 @@ struct PianoRoll: View {
             let x = layout.x(step)
             let isBar = step.isMultiple(of: MelodyProject.stepsPerBar)
             let isBeat = step.isMultiple(of: MelodyProject.stepsPerBeat)
+            let isSnap = step.isMultiple(of: snap.rawValue)
+            let opacity: Double = isBar ? 0.36 : isBeat ? 0.17 : isSnap ? 0.10 : 0.035
             context.stroke(Path { line in
                 line.move(to: CGPoint(x: x, y: layout.header))
                 line.addLine(to: CGPoint(x: x, y: layout.size.height))
-            }, with: .color(.white.opacity(isBar ? 0.34 : isBeat ? 0.15 : 0.06)), lineWidth: isBar ? 1 : 0.6)
+            }, with: .color(.white.opacity(opacity)), lineWidth: isBar ? 1 : 0.6)
 
             if isBar, step < MelodyProject.steps {
                 context.draw(
@@ -73,98 +115,142 @@ struct PianoRoll: View {
 
     private func drawNotes(_ context: GraphicsContext, layout: RollLayout) {
         for note in model.project.notes {
-            let displayed = drag?.original.id == note.id ? (drag?.candidate ?? note) : note
-            let rect = layout.rect(displayed)
-            let selected = note.id == model.selectedID
-            let outline = Path(roundedRect: rect, cornerRadius: 3)
-            context.fill(outline, with: .color(Self.accent.opacity(selected ? 1 : 0.73)))
-            if selected { context.stroke(outline, with: .color(.white.opacity(0.85)), lineWidth: 1.3) }
-            if rect.width > 23, rect.height > 13 {
-                context.draw(
-                    Text(displayed.lyric.isEmpty ? "ら" : displayed.lyric)
-                        .font(.system(size: min(12, rect.height - 3), weight: .semibold))
-                        .foregroundColor(.black),
-                    at: CGPoint(x: rect.minX + 4, y: rect.midY), anchor: .leading
-                )
-                if selected, rect.width > 35 {
-                    let grip = CGRect(x: rect.maxX - 5, y: rect.midY - 3, width: 2, height: 6)
-                    context.fill(Path(roundedRect: grip, cornerRadius: 1), with: .color(.black.opacity(0.45)))
-                }
+            let visible = drag?.original.id == note.id ? (drag?.candidate ?? note) : note
+            drawNote(visible, context: context, layout: layout, selected: note.id == model.selectedID)
+        }
+        if let drawing { drawNote(drawing, context: context, layout: layout, selected: true, ghost: true) }
+    }
+
+    private func drawNote(_ note: MelodyNote, context: GraphicsContext, layout: RollLayout, selected: Bool, ghost: Bool = false) {
+        let rect = layout.rect(note)
+        let outline = Path(roundedRect: rect, cornerRadius: 3)
+        context.fill(outline, with: .color(Self.accent.opacity(ghost ? 0.45 : selected ? 1 : 0.73)))
+        if selected { context.stroke(outline, with: .color(.white.opacity(0.85)), lineWidth: 1.3) }
+        if rect.width > 22, rect.height >= 10 {
+            let fontSize = min(12, rect.height - 2)
+            let lyric = note.lyric.isEmpty ? "ら" : note.lyric
+            let maxCharacters = max(1, Int((rect.width - 12) / fontSize))
+            context.draw(
+                Text(String(lyric.prefix(maxCharacters)))
+                    .font(.system(size: fontSize, weight: .semibold))
+                    .foregroundColor(.black),
+                at: CGPoint(x: rect.minX + 4, y: rect.midY), anchor: .leading
+            )
+        }
+        if selected, rect.width > 28 {
+            let gripHeight = min(8, rect.height - 4)
+            if gripHeight > 0 {
+                let grip = CGRect(x: rect.maxX - 6, y: rect.midY - gripHeight / 2, width: 2.5, height: gripHeight)
+                context.fill(Path(roundedRect: grip, cornerRadius: 1), with: .color(.black.opacity(0.55)))
             }
         }
     }
 
-    private func drawEntryCursor(_ context: GraphicsContext, layout: RollLayout) {
-        let x = min(layout.size.width - 1, layout.x(model.entryStep))
+    private func drawCursor(_ context: GraphicsContext, layout: RollLayout, step: Double, color: Color, width: CGFloat) {
+        let x = min(layout.size.width - 1, layout.keys + CGFloat(step) * layout.step)
         context.stroke(Path { line in
             line.move(to: CGPoint(x: x, y: layout.header))
             line.addLine(to: CGPoint(x: x, y: layout.size.height))
-        }, with: .color(Self.accent), lineWidth: 1.5)
+        }, with: .color(color), lineWidth: width)
         context.fill(Path { marker in
             marker.move(to: CGPoint(x: x - 5, y: layout.header - 6))
             marker.addLine(to: CGPoint(x: x + 5, y: layout.header - 6))
             marker.addLine(to: CGPoint(x: x, y: layout.header))
             marker.closeSubpath()
-        }, with: .color(Self.accent))
+        }, with: .color(color))
     }
 
     private func hit(_ point: CGPoint, layout: RollLayout) -> MelodyNote? {
         model.project.notes.first { layout.rect($0).insetBy(dx: -1, dy: -1).contains(point) }
     }
 
+    private func gridStep(_ x: CGFloat, layout: RollLayout) -> Int {
+        max(0, min(MelodyProject.steps - snap.rawValue, snap.floor((x - layout.keys) / layout.step)))
+    }
+
+    private func notePitch(_ y: CGFloat, layout: RollLayout) -> Int? {
+        guard y >= layout.header, y < layout.size.height else { return nil }
+        let pitch = MelodyProject.pitches.upperBound - Int((y - layout.header) / layout.row)
+        return MelodyProject.pitches.contains(pitch) ? pitch : nil
+    }
+
+    private func positionCursor(_ step: Int) {
+        model.seek(to: step)
+        if showsEntryCursor { model.moveEntryCursor(to: step) }
+    }
+
     private func tap(_ point: CGPoint, layout: RollLayout) {
-        guard drag == nil, point.y >= 0,
-              point.y < layout.size.height, point.x >= 0, point.x < layout.size.width else { return }
-        if point.y < layout.header {
-            if showsEntryCursor, point.x >= layout.keys {
-                let step = Int((point.x - layout.keys) / layout.step)
-                model.moveEntryCursor(to: step)
-            }
+        guard drag == nil, drawing == nil, point.x >= 0, point.x < layout.size.width else { return }
+        if point.y >= 0, point.y < layout.header, point.x >= layout.keys {
+            positionCursor(gridStep(point.x, layout: layout))
             return
         }
-        if let note = hit(point, layout: layout) {
+        guard let pitch = notePitch(point.y, layout: layout) else { return }
+        if point.x < layout.keys {
+            model.audition(pitch: pitch)
+        } else if let note = hit(point, layout: layout) {
             model.select(note)
+        } else if tool == .draw {
+            model.add(start: gridStep(point.x, layout: layout), pitch: pitch)
         } else {
-            let pitch = MelodyProject.pitches.upperBound - Int((point.y - layout.header) / layout.row)
-            guard MelodyProject.pitches.contains(pitch) else { return }
-            if point.x < layout.keys {
-                model.audition(pitch: pitch)
-            } else {
-                let step = Int((point.x - layout.keys) / layout.step)
-                model.add(start: step, pitch: pitch)
-            }
+            model.selectedID = nil
         }
     }
 
-    private func updateDrag(_ value: DragGesture.Value, layout: RollLayout) {
-        if drag == nil {
-            guard let note = hit(value.startLocation, layout: layout) else { return }
+    private func dragChanged(_ value: DragGesture.Value, layout: RollLayout) {
+        let origin = value.startLocation
+        if origin.y < layout.header, origin.x >= layout.keys {
+            let step = gridStep(value.location.x, layout: layout)
+            if model.transportStep != step || (showsEntryCursor && model.entryStep != step) {
+                positionCursor(step)
+            }
+            return
+        }
+        guard origin.x >= layout.keys, let pitch = notePitch(origin.y, layout: layout) else { return }
+        if drag == nil, let note = hit(origin, layout: layout) {
             let rect = layout.rect(note)
-            let resizing = value.startLocation.x >= rect.maxX - min(11, rect.width / 3)
+            let resizing = origin.x >= rect.maxX - min(14, rect.width / 3)
             model.selectedID = note.id
             drag = NoteDrag(original: note, candidate: note, resizing: resizing)
         }
-        guard var current = drag else { return }
-        let shift = Int((value.translation.width / layout.step).rounded())
-        var candidate = current.original
-        if current.resizing {
-            candidate.length = max(1, min(MelodyProject.steps - candidate.start, candidate.length + shift))
-        } else {
-            let vertical = Int((value.translation.height / layout.row).rounded())
-            candidate.start = max(0, min(MelodyProject.steps - candidate.length, candidate.start + shift))
-            candidate.pitch = max(MelodyProject.pitches.lowerBound, min(MelodyProject.pitches.upperBound, candidate.pitch - vertical))
-        }
-        if model.project.canPlace(candidate) {
-            current.candidate = candidate
-            drag = current
+        if var current = drag {
+            let delta = value.translation.width / layout.step
+            var candidate = current.original
+            if current.resizing {
+                if abs(delta) >= CGFloat(snap.rawValue) / 2 {
+                    let firstEnd = snap.floor(CGFloat(candidate.start)) + snap.rawValue
+                    let end = max(firstEnd, min(MelodyProject.steps, snap.nearest(CGFloat(candidate.end) + delta)))
+                    candidate.length = end - candidate.start
+                }
+            } else {
+                if abs(delta) >= CGFloat(snap.rawValue) / 2 {
+                    let start = snap.nearest(CGFloat(candidate.start) + delta)
+                    let lastStart = snap.floor(CGFloat(MelodyProject.steps - candidate.length))
+                    candidate.start = max(0, min(lastStart, start))
+                }
+                let vertical = Int((value.translation.height / layout.row).rounded())
+                candidate.pitch = max(MelodyProject.pitches.lowerBound, min(MelodyProject.pitches.upperBound, candidate.pitch - vertical))
+            }
+            if model.project.canPlace(candidate) {
+                current.candidate = candidate
+                drag = current
+            }
+        } else if tool == .draw {
+            let from = gridStep(origin.x, layout: layout)
+            let to = gridStep(value.location.x, layout: layout)
+            drawing = model.project.newNote(at: min(from, to), pitch: pitch, length: abs(from - to) + snap.rawValue)
         }
     }
 
     private func commitDrag() {
-        defer { drag = nil }
-        guard let drag, drag.candidate != drag.original else { return }
-        if model.place(drag.candidate), drag.candidate.pitch != drag.original.pitch {
-            model.audition(pitch: drag.candidate.pitch)
+        defer {
+            drag = nil
+            drawing = nil
+        }
+        if let drag, drag.candidate != drag.original, model.place(drag.candidate) {
+            if drag.candidate.pitch != drag.original.pitch { model.audition(pitch: drag.candidate.pitch) }
+        } else if let drawing, model.place(drawing) {
+            model.select(drawing)
         }
     }
 }

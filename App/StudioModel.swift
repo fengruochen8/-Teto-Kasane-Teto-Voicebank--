@@ -8,6 +8,9 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var bank = StudioStorage.loadBank()
     @Published var selectedID: UUID?
     @Published private(set) var entryStep = 0
+    @Published private(set) var transportStep = 0
+    @Published private var undoHistory: [EditSnapshot] = []
+    @Published private var redoHistory: [EditSnapshot] = []
     @Published var errorMessage: String?
     @Published private(set) var isImporting = false
     @Published private(set) var isRendering = false
@@ -19,6 +22,21 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var previewPlayer: AVAudioPlayer?
     private var songPlayer: AVAudioPlayer?
     private var cache: Data?
+    private var lyricEditNote: UUID?
+
+    private struct EditSnapshot {
+        let project: MelodyProject
+        let selectedID: UUID?
+        let entryStep: Int
+    }
+
+    var canUndo: Bool { !undoHistory.isEmpty }
+    var canRedo: Bool { !redoHistory.isEmpty }
+
+    var playbackPosition: Double? {
+        guard isPlaying, let player = songPlayer, player.duration > 0 else { return nil }
+        return min(Double(MelodyProject.steps), max(0, player.currentTime / player.duration * Double(MelodyProject.steps)))
+    }
 
     var selected: MelodyNote? { project.notes.first { $0.id == selectedID } }
 
@@ -36,7 +54,19 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         entryStep = min(MelodyProject.steps, max(0, step))
     }
 
+    func seek(to step: Int) {
+        transportStep = min(MelodyProject.steps - 1, max(0, step))
+        if let player = songPlayer, isPlaying {
+            player.currentTime = transportTime(duration: player.duration)
+        }
+    }
+
+    private func transportTime(duration: TimeInterval) -> TimeInterval {
+        duration * Double(transportStep) / Double(MelodyProject.steps)
+    }
+
     func select(_ note: MelodyNote) {
+        finishLyricEdit()
         selectedID = note.id
         moveEntryCursor(to: note.start)
         audition(pitch: note.pitch)
@@ -54,7 +84,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     @discardableResult
-    func place(_ note: MelodyNote) -> Bool {
+    func place(_ note: MelodyNote, lyricEdit: UUID? = nil) -> Bool {
         guard project.canPlace(note) else { return false }
         var updated = project
         if let index = updated.notes.firstIndex(where: { $0.id == note.id }) {
@@ -62,22 +92,26 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         } else {
             updated.notes.append(note)
         }
-        update(updated)
+        update(updated, lyricEdit: lyricEdit)
         return true
     }
 
     func setLyric(_ text: String) {
         guard var note = selected else { return }
         note.lyric = String(text.prefix(12))
-        place(note)
+        place(note, lyricEdit: note.id)
+    }
+
+    func finishLyricEdit() {
+        lyricEditNote = nil
     }
 
     func deleteSelected() {
         guard let selectedID else { return }
         var updated = project
         updated.notes.removeAll { $0.id == selectedID }
-        self.selectedID = nil
         update(updated)
+        self.selectedID = nil
     }
 
     func setTempo(_ tempo: Int) {
@@ -86,8 +120,43 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         update(updated)
     }
 
-    private func update(_ value: MelodyProject) {
+    private var editSnapshot: EditSnapshot {
+        EditSnapshot(project: project, selectedID: selectedID, entryStep: entryStep)
+    }
+
+    func undo() {
+        guard let previous = undoHistory.popLast() else { return }
+        redoHistory.append(editSnapshot)
+        restore(previous)
+    }
+
+    func redo() {
+        guard let next = redoHistory.popLast() else { return }
+        undoHistory.append(editSnapshot)
+        restore(next)
+    }
+
+    private func restore(_ snapshot: EditSnapshot) {
+        finishLyricEdit()
+        apply(snapshot.project)
+        selectedID = snapshot.selectedID
+        moveEntryCursor(to: snapshot.entryStep)
+    }
+
+    private func update(_ value: MelodyProject, lyricEdit: UUID? = nil) {
         guard value != project else { return }
+        if lyricEdit == nil || lyricEdit != lyricEditNote {
+            undoHistory.append(editSnapshot)
+            if undoHistory.count > 64 {
+                undoHistory.removeFirst()
+            }
+            redoHistory.removeAll()
+        }
+        lyricEditNote = lyricEdit
+        apply(value)
+    }
+
+    private func apply(_ value: MelodyProject) {
         project = value
         invalidateAudio()
         do {
@@ -157,6 +226,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             try AVAudioSession.sharedInstance().setActive(true)
             let player = try AVAudioPlayer(data: data)
             player.numberOfLoops = loops ? -1 : 0
+            player.currentTime = transportTime(duration: player.duration)
             player.delegate = self
             previewPlayer?.stop()
             guard player.play() else { throw StudioError.playback }

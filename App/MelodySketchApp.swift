@@ -30,6 +30,9 @@ private struct WaveDocument: FileDocument {
 @MainActor
 struct StudioView: View {
     @StateObject private var model = StudioModel()
+    @State private var tool = PianoRollTool.select
+    @State private var snap = GridSnap.sixteenth
+    @FocusState private var editingLyric: Bool
     @State private var keyboardExpanded = false
     @State private var keyboardMode = PianoKeyboardMode.audition
     @State private var showImporter = false
@@ -40,8 +43,9 @@ struct StudioView: View {
         VStack(alignment: .leading, spacing: 14) {
             header
             controls
+            editorTools
             noteInspector
-            PianoRoll(model: model, showsEntryCursor: keyboardExpanded && keyboardMode == .entry)
+            PianoRoll(model: model, showsEntryCursor: keyboardExpanded && keyboardMode == .entry, tool: tool, snap: snap)
                 .frame(minHeight: 180)
                 .layoutPriority(1)
             PianoKeyboard(isExpanded: $keyboardExpanded, mode: $keyboardMode, location: model.entryLocation) { pitch in
@@ -55,6 +59,9 @@ struct StudioView: View {
         .background(Color(red: 0.07, green: 0.11, blue: 0.15).ignoresSafeArea())
         .preferredColorScheme(.dark)
         .tint(PianoRoll.accent)
+        .onChange(of: editingLyric) { _, editing in
+            if !editing { model.finishLyricEdit() }
+        }
         .fileImporter(isPresented: $showImporter, allowedContentTypes: [.zip]) { result in
             switch result {
             case .success(let url):
@@ -131,6 +138,13 @@ struct StudioView: View {
 
     private var transport: some View {
         HStack(spacing: 12) {
+            Button("回到开头", systemImage: "backward.end.fill") {
+                model.seek(to: 0)
+                if keyboardExpanded && keyboardMode == .entry { model.moveEntryCursor(to: 0) }
+            }
+            .buttonStyle(.bordered)
+            .labelStyle(.iconOnly)
+
             Button(model.isPlaying ? "停止" : "Teto唱一遍", systemImage: model.isPlaying ? "stop.fill" : "play.fill") {
                 Task { await model.sing() }
             }
@@ -170,6 +184,62 @@ struct StudioView: View {
         .fixedSize(horizontal: true, vertical: false)
     }
 
+    private var editorTools: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 12) {
+                toolPicker
+                historyButtons
+                Spacer(minLength: 10)
+                snapPicker
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 12) { toolPicker; historyButtons }
+                snapPicker
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 11))
+    }
+
+    private var toolPicker: some View {
+        Picker("编辑工具", selection: $tool) {
+            Text("选择").tag(PianoRollTool.select)
+            Text("画笔").tag(PianoRollTool.draw)
+        }
+        .pickerStyle(.segmented)
+        .frame(width: 144)
+    }
+
+    private var historyButtons: some View {
+        HStack(spacing: 6) {
+            Button("撤销", systemImage: "arrow.uturn.backward") { model.undo() }
+                .keyboardShortcut("z", modifiers: .command)
+                .disabled(!model.canUndo)
+            Button("重做", systemImage: "arrow.uturn.forward") { model.redo() }
+                .keyboardShortcut("z", modifiers: [.command, .shift])
+                .disabled(!model.canRedo)
+        }
+        .buttonStyle(.bordered)
+        .labelStyle(.iconOnly)
+    }
+
+    private var snapPicker: some View {
+        HStack(spacing: 8) {
+            Text("网格吸附")
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Picker("网格吸附", selection: $snap) {
+                ForEach(GridSnap.allCases, id: \.self) { resolution in
+                    Text("1/\(16 / resolution.rawValue)").tag(resolution)
+                }
+            }
+            .pickerStyle(.segmented)
+            .frame(width: 150)
+        }
+        .fixedSize()
+    }
+
     private var noteInspector: some View {
         HStack(spacing: 12) {
             if let note = model.selected {
@@ -181,6 +251,7 @@ struct StudioView: View {
                     set: { model.setLyric($0) }
                 ))
                 .textFieldStyle(.roundedBorder)
+                .focused($editingLyric)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
                 .accessibilityLabel("音符假名")
@@ -196,7 +267,7 @@ struct StudioView: View {
                     .labelStyle(.iconOnly)
                     .accessibilityLabel("删除音符")
             } else {
-                Text("点格子加音符。拖动音符改位置，拖右端改时值。")
+                Text(tool == .select ? "点选音符编辑。点上方时间尺定位播放。" : "点空白网格添加音符，拖动可设置时值。")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                 Spacer()
