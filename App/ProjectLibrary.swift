@@ -6,7 +6,7 @@ struct ProjectDocument: Codable, Sendable {
     var melody: MelodyProject
 
     init(name: String, melody: MelodyProject) {
-        self.version = 2
+        self.version = 3
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         self.melody = melody
     }
@@ -28,7 +28,7 @@ struct ProjectDocument: Codable, Sendable {
     func encoded() throws -> Data {
         try validate()
         let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.outputFormatting = [.sortedKeys]
         let data = try encoder.encode(self)
         guard data.count <= ProjectLibrary.maximumFileSize else {
             throw ProjectLibraryError.fileTooLarge
@@ -37,7 +37,7 @@ struct ProjectDocument: Codable, Sendable {
     }
 
     func validate() throws {
-        guard version == 2, Self.validName(name), melody.isValid else {
+        guard version == 3, Self.validName(name), melody.isValid else {
             throw ProjectLibraryError.invalidDocument
         }
     }
@@ -53,10 +53,10 @@ struct ProjectDocument: Codable, Sendable {
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let sourceVersion = try container.decode(Int.self, forKey: .version)
-        guard sourceVersion == 1 || sourceVersion == 2 else {
+        guard (1...3).contains(sourceVersion) else {
             throw DecodingError.dataCorruptedError(forKey: .version, in: container, debugDescription: "Unsupported project version")
         }
-        self.version = 2
+        self.version = 3
         self.name = try container.decode(String.self, forKey: .name).trimmingCharacters(in: .whitespacesAndNewlines)
         self.melody = try container.decode(MelodyProject.self, forKey: .melody)
     }
@@ -77,7 +77,7 @@ struct LocalProject: Codable, Identifiable, Sendable {
 }
 
 enum ProjectLibrary {
-    static let maximumFileSize = 1_048_576
+    static let maximumFileSize = 16 * 1_048_576
     private static let legacyRecordID = UUID(uuidString: "70FBBFB0-A2D8-4A04-8E83-F162B40026A2")!
 
     private static var directory: URL {
@@ -184,7 +184,7 @@ enum ProjectLibrary {
         directory.appendingPathComponent(id.uuidString).appendingPathExtension("json")
     }
 
-    private static func coordinatedRead(_ url: URL) throws -> Data {
+    static func coordinatedRead(_ url: URL) throws -> Data {
         let accessed = url.startAccessingSecurityScopedResource()
         defer { if accessed { url.stopAccessingSecurityScopedResource() } }
 
@@ -220,7 +220,7 @@ private enum ProjectLibraryError: LocalizedError {
         case .invalidDocument:
             return "项目文件格式无效，或旋律超出了支持范围。"
         case .fileTooLarge:
-            return "项目文件为空或超过1MB限制。"
+            return "项目文件为空或超过16MB限制。"
         case .unreadableFile:
             return "无法读取项目文件。"
         }

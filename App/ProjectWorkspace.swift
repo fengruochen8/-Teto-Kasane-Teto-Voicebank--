@@ -5,10 +5,34 @@ import UniformTypeIdentifiers
 private extension UTType {
     static let tetoProject = UTType(exportedAs: "com.fengruochen8.tetomelody.project", conformingTo: .json)
     static let wavAudio = UTType(filenameExtension: "wav") ?? .audio
+    static let midiArrangement = UTType(filenameExtension: "mid") ?? UTType(importedAs: "public.midi-audio", conformingTo: .audio)
+    static let ustArrangement = UTType(importedAs: "com.fengruochen8.tetomelody.ust", conformingTo: .plainText)
+    static let ustxArrangement = UTType(importedAs: "com.fengruochen8.tetomelody.ustx", conformingTo: .plainText)
+}
+
+private extension ProjectInterchange {
+    var contentType: UTType {
+        switch self {
+        case .midi: return .midiArrangement
+        case .ust: return .ustArrangement
+        case .ustx: return .ustxArrangement
+        }
+    }
+
+    init?(fileURL: URL) {
+        switch fileURL.pathExtension.lowercased() {
+        case "mid", "midi": self = .midi
+        case "ust": self = .ust
+        case "ustx": self = .ustx
+        default: return nil
+        }
+    }
 }
 
 private struct WorkspaceFile: FileDocument {
-    static var readableContentTypes: [UTType] { [.tetoProject, .wavAudio] }
+    static var readableContentTypes: [UTType] {
+        [.tetoProject, .wavAudio] + ProjectInterchange.allCases.map(\.contentType)
+    }
     var data: Data
 
     init(data: Data) { self.data = data }
@@ -27,6 +51,7 @@ private struct WorkspaceFile: FileDocument {
 
 @MainActor
 struct ProjectWorkspace: View {
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var model = StudioModel()
     @State private var isNamingProject = false
     @State private var isImportingFile = false
@@ -37,11 +62,13 @@ struct ProjectWorkspace: View {
     private enum ImportKind {
         case project
         case voicebank
+        case arrangement
 
         var types: [UTType] {
             switch self {
             case .project: return [.tetoProject]
             case .voicebank: return [.zip]
+            case .arrangement: return ProjectInterchange.allCases.map(\.contentType)
             }
         }
     }
@@ -63,7 +90,9 @@ struct ProjectWorkspace: View {
                     onSave: { saveProject(asCopy: false) },
                     onSaveAs: { saveProject(asCopy: true) },
                     onImportVoicebank: { chooseFile(.voicebank) },
-                    onExportWave: { Task { await exportWave() } }
+                    onExportWave: { trackID in Task { await exportWave(trackID: trackID) } },
+                    onImportArrangement: { chooseFile(.arrangement) },
+                    onExportArrangement: { format in Task { await exportArrangement(format) } }
                 )
                 .id(record.id)
             } else {
@@ -71,6 +100,7 @@ struct ProjectWorkspace: View {
                     projects: model.recentProjects,
                     onNew: { isNamingProject = true },
                     onOpen: { chooseFile(.project) },
+                    onImportArrangement: { chooseFile(.arrangement) },
                     onExample: { model.createProject(named: "示例旋律", melody: .example) },
                     onRecent: { model.openLocalProject($0) }
                 )
@@ -87,6 +117,9 @@ struct ProjectWorkspace: View {
         .preferredColorScheme(.dark)
         .tint(PianoRoll.accent)
         .task { model.loadProjectLibrary() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .background { model.flushAutosave() }
+        }
         .sheet(isPresented: $isNamingProject) {
             NewProjectSheet { model.createProject(named: $0) }
                 .presentationDetents([.height(225)])
@@ -111,6 +144,14 @@ struct ProjectWorkspace: View {
         } message: {
             Text(model.errorMessage ?? "")
         }
+        .alert("乐谱已导入", isPresented: Binding(
+            get: { model.importNotice != nil },
+            set: { if !$0 { model.importNotice = nil } }
+        )) {
+            Button("好", role: .cancel) { model.importNotice = nil }
+        } message: {
+            Text(model.importNotice ?? "")
+        }
     }
 
     private func chooseFile(_ kind: ImportKind) {
@@ -127,6 +168,12 @@ struct ProjectWorkspace: View {
                 Task { await model.openExternalProject(url) }
             case .voicebank:
                 Task { await model.importZIP(url) }
+            case .arrangement:
+                guard let format = ProjectInterchange(fileURL: url) else {
+                    model.errorMessage = "请选择 MIDI、UST 或 USTX 乐谱。"
+                    return
+                }
+                Task { await model.importArrangement(url, format: format) }
             }
         case .failure(let error):
             showFileError(error)
@@ -151,11 +198,22 @@ struct ProjectWorkspace: View {
         }
     }
 
-    private func exportWave() async {
-        guard let record = model.currentProject, let data = await model.renderedAudio() else { return }
+    private func exportWave(trackID: UUID?) async {
+        guard let record = model.currentProject,
+              let data = await model.renderedAudio(trackID: trackID) else { return }
+        let suffix = record.document.melody.tracks.first { $0.id == trackID }?.name ?? "混音"
         exportRequest = ExportRequest(
             file: WorkspaceFile(data: data), type: .wavAudio,
-            filename: filename(record.document.name), projectID: nil
+            filename: filename("\(record.document.name) - \(suffix)"), projectID: nil
+        )
+        isExportingFile = true
+    }
+
+    private func exportArrangement(_ format: ProjectInterchange) async {
+        guard let record = model.currentProject, let data = await model.exportArrangement(format) else { return }
+        exportRequest = ExportRequest(
+            file: WorkspaceFile(data: data), type: format.contentType,
+            filename: filename(record.document.name) + "." + format.fileExtension, projectID: nil
         )
         isExportingFile = true
     }
@@ -195,6 +253,7 @@ private struct WelcomeView: View {
     let projects: [LocalProject]
     let onNew: () -> Void
     let onOpen: () -> Void
+    let onImportArrangement: () -> Void
     let onExample: () -> Void
     let onRecent: (LocalProject) -> Void
 
@@ -203,8 +262,8 @@ private struct WelcomeView: View {
             VStack(alignment: .leading, spacing: 22) {
                 hero
                 ViewThatFits(in: .horizontal) {
-                    HStack(spacing: 14) { newCard; openCard }
-                    VStack(spacing: 12) { newCard; openCard }
+                    HStack(spacing: 14) { newCard; openCard; importCard }
+                    VStack(spacing: 12) { newCard; openCard; importCard }
                 }
                 recent
             }
@@ -309,6 +368,10 @@ private struct WelcomeView: View {
         actionCard("打开工程", detail: "从「文件」打开 .tetomelody", icon: "folder", highlighted: false, action: onOpen)
     }
 
+    private var importCard: some View {
+        actionCard("导入乐谱", detail: "MIDI、UST 或 USTX", icon: "tray.and.arrow.down", highlighted: false, action: onImportArrangement)
+    }
+
     private func actionCard(_ title: String, detail: String, icon: String, highlighted: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(alignment: .top, spacing: 15) {
@@ -376,7 +439,7 @@ private struct WelcomeView: View {
                                     .background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(record.document.name).font(.headline).foregroundStyle(StudioTheme.ink).lineLimit(1)
-                                    Text("\(record.document.melody.tracks.count)条音轨 · \(record.document.melody.noteCount)个音符 · \(record.document.melody.tempo) BPM")
+                                    Text("\(record.document.melody.barCount)小节 · \(record.document.melody.tracks.count)条音轨 · \(record.document.melody.tempo) BPM")
                                         .font(.subheadline).foregroundStyle(StudioTheme.muted)
                                 }
                                 Spacer(minLength: 4)

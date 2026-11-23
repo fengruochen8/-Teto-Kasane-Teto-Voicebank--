@@ -1,0 +1,50 @@
+name: iPad simulator tests
+
+on:
+  push:
+    branches: [codex/ipad-v0.1]
+    paths:
+      - 'App/**'
+      - 'Native/**'
+      - 'Tests/**'
+      - 'TetoMelody.xcodeproj/**'
+      - '.github/workflows/ipad-test.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ipad-test-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select Xcode and iPad
+        run: |
+          echo 'DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer' >> "$GITHUB_ENV"
+          export DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer
+          xcodebuild -version
+          device=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)["devices"]
+          targets = [device for device in data.get("com.apple.CoreSimulator.SimRuntime.iOS-18-5", []) if device["name"].startswith("iPad")]
+          if not targets:
+              sys.exit("No available iPad on the iOS 18.5 simulator runtime")
+          print(targets[0]["udid"])
+          ')
+          printf 'IPAD_SIMULATOR_ID=%s\n' "$device" >> "$GITHUB_ENV"
+      - name: Build and test
+        run: |
+          set -o pipefail
+          xcodebuild test -project TetoMelody.xcodeproj -scheme TetoMelody \
+            -destination "platform=iOS Simulator,id=$IPAD_SIMULATOR_ID" \
+            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
+      - name: Test the standalone DSP
+        run: |
+          c++ -std=c++17 -O2 -Wall -Wextra -Werror -INative Native/TetoDSP.cpp Tests/TetoDSPTests.cpp -o "$RUNNER_TEMP/teto-dsp-tests"
+          "$RUNNER_TEMP/teto-dsp-tests"

@@ -25,6 +25,11 @@
 		B20000000000000000000019 /* JapaneseLyricsNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000020 /* JapaneseLyricsNotices.txt */; };
 		B20000000000000000000017 /* Mecab-Swift in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000004 /* Mecab-Swift */; };
 		B20000000000000000000018 /* IPADic in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000005 /* IPADic */; };
+		B20000000000000000000020 /* ProjectInterchange.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000021 /* ProjectInterchange.swift */; };
+		B20000000000000000000021 /* NoteExpressionSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000022 /* NoteExpressionSheet.swift */; };
+		B20000000000000000000022 /* Yams in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000007 /* Yams */; };
+		B20000000000000000000023 /* ProjectInterchangeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000024 /* ProjectInterchangeTests.swift */; };
+		B20000000000000000000024 /* ProjectMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000025 /* ProjectMigrationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -48,7 +53,22 @@
 		A10000000000000000000018 /* JapaneseLyrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JapaneseLyrics.swift; sourceTree = "<group>"; };
 		A10000000000000000000019 /* BatchLyricsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchLyricsSheet.swift; sourceTree = "<group>"; };
 		A10000000000000000000020 /* JapaneseLyricsNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = JapaneseLyricsNotices.txt; sourceTree = "<group>"; };
+		A10000000000000000000021 /* ProjectInterchange.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectInterchange.swift; sourceTree = "<group>"; };
+		A10000000000000000000022 /* NoteExpressionSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NoteExpressionSheet.swift; sourceTree = "<group>"; };
+		A10000000000000000000023 /* TetoMelodyTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TetoMelodyTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000024 /* ProjectInterchangeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectInterchangeTests.swift; sourceTree = "<group>"; };
+		A10000000000000000000025 /* ProjectMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectMigrationTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXContainerItemProxy section */
+		D40000000000000000000009 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F60000000000000000000002 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F60000000000000000000001;
+			remoteInfo = TetoMelody;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		D40000000000000000000001 /* Frameworks */ = {
@@ -58,7 +78,17 @@
 				B20000000000000000000009 /* ZIPFoundation in Frameworks */,
 				B20000000000000000000017 /* Mecab-Swift in Frameworks */,
 				B20000000000000000000018 /* IPADic in Frameworks */,
+				B20000000000000000000022 /* Yams in Frameworks */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D40000000000000000000005 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -66,7 +96,7 @@
 /* Begin PBXGroup section */
 		E50000000000000000000001 = {
 			isa = PBXGroup;
-			children = (E50000000000000000000002 /* App */, E50000000000000000000003 /* Native */, E50000000000000000000004 /* Products */,);
+			children = (E50000000000000000000002 /* App */, E50000000000000000000003 /* Native */, E50000000000000000000005 /* Tests */, E50000000000000000000004 /* Products */,);
 			sourceTree = "<group>";
 		};
 		E50000000000000000000002 /* App */ = {
@@ -80,6 +110,8 @@
 				A10000000000000000000017 /* TrackPanel.swift */,
 				A10000000000000000000018 /* JapaneseLyrics.swift */,
 				A10000000000000000000019 /* BatchLyricsSheet.swift */,
+				A10000000000000000000021 /* ProjectInterchange.swift */,
+				A10000000000000000000022 /* NoteExpressionSheet.swift */,
 				A10000000000000000000020 /* JapaneseLyricsNotices.txt */,
 				A10000000000000000000013 /* ProjectLibrary.swift */,
 				A10000000000000000000003 /* Project.swift */,
@@ -101,8 +133,14 @@
 		};
 		E50000000000000000000004 /* Products */ = {
 			isa = PBXGroup;
-			children = (A10000000000000000000010 /* TetoMelody.app */,);
+			children = (A10000000000000000000010 /* TetoMelody.app */, A10000000000000000000023 /* TetoMelodyTests.xctest */,);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		E50000000000000000000005 /* Tests */ = {
+			isa = PBXGroup;
+			children = (A10000000000000000000024 /* ProjectInterchangeTests.swift */, A10000000000000000000025 /* ProjectMigrationTests.swift */,);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -123,10 +161,22 @@
 				C30000000000000000000002 /* ZIPFoundation */,
 				C30000000000000000000004 /* Mecab-Swift */,
 				C30000000000000000000005 /* IPADic */,
+				C30000000000000000000007 /* Yams */,
 			);
 			productName = TetoMelody;
 			productReference = A10000000000000000000010 /* TetoMelody.app */;
 			productType = "com.apple.product-type.application";
+		};
+		F60000000000000000000011 /* TetoMelodyTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F60000000000000000000014 /* Build configuration list for PBXNativeTarget "TetoMelodyTests" */;
+			buildPhases = (D40000000000000000000004 /* Sources */, D40000000000000000000005 /* Frameworks */, D40000000000000000000006 /* Resources */);
+			buildRules = ();
+			dependencies = (D40000000000000000000008 /* PBXTargetDependency */);
+			name = TetoMelodyTests;
+			productName = TetoMelodyTests;
+			productReference = A10000000000000000000023 /* TetoMelodyTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -143,11 +193,12 @@
 			packageReferences = (
 				C30000000000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
 				C30000000000000000000003 /* XCRemoteSwiftPackageReference "Mecab-Swift" */,
+				C30000000000000000000006 /* XCRemoteSwiftPackageReference "Yams" */,
 			);
 			productRefGroup = E50000000000000000000004 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
-			targets = (F60000000000000000000001 /* TetoMelody */,);
+			targets = (F60000000000000000000001 /* TetoMelody */, F60000000000000000000011 /* TetoMelodyTests */,);
 		};
 /* End PBXProject section */
 
@@ -159,6 +210,15 @@
 				B20000000000000000000008 /* Assets.xcassets in Resources */,
 				B20000000000000000000019 /* JapaneseLyricsNotices.txt in Resources */,
 			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D40000000000000000000006 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
@@ -176,6 +236,8 @@
 				B20000000000000000000014 /* TrackPanel.swift in Sources */,
 				B20000000000000000000015 /* JapaneseLyrics.swift in Sources */,
 				B20000000000000000000016 /* BatchLyricsSheet.swift in Sources */,
+				B20000000000000000000020 /* ProjectInterchange.swift in Sources */,
+				B20000000000000000000021 /* NoteExpressionSheet.swift in Sources */,
 				B20000000000000000000011 /* ProjectLibrary.swift in Sources */,
 				B20000000000000000000003 /* Project.swift in Sources */,
 				B20000000000000000000004 /* Voicebank.swift in Sources */,
@@ -186,6 +248,23 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D40000000000000000000004 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B20000000000000000000023 /* ProjectInterchangeTests.swift in Sources */, B20000000000000000000024 /* ProjectMigrationTests.swift in Sources */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		D40000000000000000000008 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F60000000000000000000001 /* TetoMelody */;
+			targetProxy = D40000000000000000000009 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		F60000000000000000000007 /* Debug */ = {
@@ -226,6 +305,16 @@
 			buildSettings = {};
 			name = Release;
 		};
+		F60000000000000000000012 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = { BUNDLE_LOADER = "$(TEST_HOST)"; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.fengruochen8.tetomelody.tests; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 2; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TetoMelody.app/TetoMelody"; };
+			name = Debug;
+		};
+		F60000000000000000000013 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = { BUNDLE_LOADER = "$(TEST_HOST)"; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.fengruochen8.tetomelody.tests; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 2; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TetoMelody.app/TetoMelody"; };
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -241,6 +330,12 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
+		F60000000000000000000014 /* Build configuration list for PBXNativeTarget "TetoMelodyTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (F60000000000000000000012 /* Debug */, F60000000000000000000013 /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
@@ -253,6 +348,11 @@
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/shinjukunian/Mecab-Swift.git";
 			requirement = {kind = exactVersion; version = 0.8.0; };
+		};
+		C30000000000000000000006 /* XCRemoteSwiftPackageReference "Yams" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/jpsim/Yams.git";
+			requirement = {kind = exactVersion; version = 6.2.2; };
 		};
 /* End XCRemoteSwiftPackageReference section */
 
@@ -271,6 +371,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C30000000000000000000003 /* XCRemoteSwiftPackageReference "Mecab-Swift" */;
 			productName = "IPADic";
+		};
+		C30000000000000000000007 /* Yams */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C30000000000000000000006 /* XCRemoteSwiftPackageReference "Yams" */;
+			productName = Yams;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

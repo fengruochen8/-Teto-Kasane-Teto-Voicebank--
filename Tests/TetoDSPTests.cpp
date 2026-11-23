@@ -55,10 +55,41 @@ void TestShortRecordings() {
     }
 }
 
+void TestPitchCurveAndRegionRendering() {
+    std::vector<float> source(kSampleRate / 3);
+    for (size_t i = 0; i < source.size(); ++i) {
+        source[i] = 0.35f * std::sin(2 * kPi * 220 * i / kSampleRate);
+    }
+    constexpr int attack = 117;
+    const int32_t period = teto_note_period(source.data(), static_cast<int32_t>(source.size()), kSampleRate, attack);
+    assert(period > 0);
+    constexpr int duration = 2 * kSampleRate;
+    const TetoPitchPoint points[] = {{0, 330}, {kSampleRate * 7 / 10, 330}, {kSampleRate * 12 / 10, 440}};
+    std::vector<float> full(duration);
+    const auto render = [&](int start, std::vector<float>& buffer) {
+        return teto_mix_note_curve(source.data(), static_cast<int32_t>(source.size()), kSampleRate, attack, period,
+            points, 3, duration, start, 0.75f, buffer.data(), static_cast<int32_t>(buffer.size()));
+    };
+    assert(render(0, full) == 0);
+    const std::vector<float> early(full.begin(), full.begin() + kSampleRate * 7 / 10);
+    const std::vector<float> late(full.begin() + kSampleRate * 13 / 10, full.end());
+    assert(ToneEnergy(early, 330) > 20 * ToneEnergy(early, 440));
+    assert(ToneEnergy(late, 440) > 20 * ToneEnergy(late, 330));
+
+    constexpr int cropStart = kSampleRate * 9 / 10;
+    std::vector<float> region(kSampleRate / 2, 0.125f);
+    assert(render(cropStart, region) == 0);
+    for (size_t i = 0; i < region.size(); ++i) {
+        assert(std::abs(region[i] - (full[cropStart + i] + 0.125f)) < 1e-5f);
+    }
+    assert(render(duration, region) != 0);
+}
+
 } // namespace
 
 int main() {
     TestPitchChange();
     TestShortRecordings();
-    std::cout << "DSP pitch and short-recording tests passed.\n";
+    TestPitchCurveAndRegionRendering();
+    std::cout << "DSP pitch, short-recording, curve and crop tests passed.\n";
 }

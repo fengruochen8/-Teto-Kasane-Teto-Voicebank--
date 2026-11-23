@@ -12,6 +12,7 @@ struct PianoKeyboard: View {
     let location: String
     let onKey: (Int) -> Void
 
+    @State private var lowestPitch = 55
     private let keybedHeight: CGFloat = 96
 
     var body: some View {
@@ -54,6 +55,12 @@ struct PianoKeyboard: View {
                     }
 
                     Spacer(minLength: 0)
+                    Button("键盘下降八度", systemImage: "minus") { lowestPitch = max(0, lowestPitch - 12) }
+                        .labelStyle(.iconOnly)
+                        .disabled(lowestPitch == 0)
+                    Button("键盘上升八度", systemImage: "plus") { lowestPitch = min(104, lowestPitch + 12) }
+                        .labelStyle(.iconOnly)
+                        .disabled(lowestPitch == 104)
                     Button {
                         isExpanded = false
                     } label: {
@@ -77,6 +84,7 @@ struct PianoKeyboard: View {
                 .accessibilityLabel("展开钢琴键盘")
             }
         }
+        .buttonStyle(.plain)
         .padding(.horizontal, 12)
         .frame(height: isExpanded ? 40 : 36)
         .background(StudioTheme.raised)
@@ -98,7 +106,7 @@ struct PianoKeyboard: View {
 
     private var keyboard: some View {
         GeometryReader { geometry in
-            let pitches = Array(MelodyProject.pitches)
+            let pitches = Array(lowestPitch...(lowestPitch + 23))
             let whiteKeys = pitches.filter { isWhiteKey($0) }
             let blackKeys = pitches.filter { !isWhiteKey($0) }
             let whiteWidth = geometry.size.width / CGFloat(whiteKeys.count)
@@ -138,7 +146,7 @@ struct PianoKeyboard: View {
         } label: {
             VStack(spacing: 0) {
                 Spacer(minLength: 0)
-                if !black && (midi % 12 == 0 || midi == MelodyProject.pitches.lowerBound) {
+                if !black && (midi % 12 == 0 || midi == lowestPitch) {
                     Text(MelodyProject.noteName(midi))
                         .font(.system(size: 10, weight: .semibold, design: .rounded))
                         .foregroundStyle(Color.black.opacity(0.62))

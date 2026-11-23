@@ -10,7 +10,10 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var isHandlingProjectFile = false
     @Published private(set) var saveStatus: String?
     @Published private(set) var bank = StudioStorage.loadBank()
-    @Published var selectedID: UUID?
+    @Published private(set) var selectedID: UUID?
+    @Published private(set) var selectedIDs: Set<UUID> = []
+    @Published private(set) var hasCopiedNotes = false
+    @Published var importNotice: String?
     @Published private(set) var activeTrackID: UUID?
     @Published private(set) var entryStep = 0
     @Published private(set) var transportStep = 0
@@ -21,12 +24,25 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var isRendering = false
     @Published private(set) var isPlaying = false
     @Published var loops = true {
-        didSet { songPlayer?.numberOfLoops = loops ? -1 : 0 }
+        didSet {
+            guard oldValue != loops else { return }
+            if project.loopRegion != nil { stop() }
+            else { songPlayer?.numberOfLoops = loops ? -1 : 0 }
+        }
     }
 
     private var previewPlayer: AVAudioPlayer?
     private var songPlayer: AVAudioPlayer?
-    private var cache: Data?
+    private struct RenderRequest: Equatable {
+        let window: Range<Int>?
+        let trackID: UUID?
+    }
+
+    private var cache: (request: RenderRequest, data: Data)?
+    private var renderTask: Task<Data, Error>?
+    private var playingRegion: Range<Int>?
+    private var copiedNotes: [MelodyNote] = []
+    private var autosaveTask: Task<Void, Never>?
     private var lyricEditNote: UUID?
     private var externalProjectURL: URL?
     private var didLoadProjectLibrary = false
@@ -34,6 +50,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private struct EditSnapshot {
         let project: MelodyProject
         let selectedID: UUID?
+        let selectedIDs: Set<UUID>
         let activeTrackID: UUID?
         let entryStep: Int
     }
@@ -44,8 +61,8 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     var isBusy: Bool { isHandlingProjectFile || isImporting || isRendering }
 
     var playbackPosition: Double? {
-        guard isPlaying, let player = songPlayer, player.duration > 0 else { return nil }
-        return min(Double(MelodyProject.steps), max(0, player.currentTime / player.duration * Double(MelodyProject.steps)))
+        guard isPlaying, let player = songPlayer, let region = playingRegion, player.duration > 0 else { return nil }
+        return Double(region.lowerBound) + min(1, max(0, player.currentTime / player.duration)) * Double(region.count)
     }
 
     var activeTrack: MelodyTrack? {
@@ -53,6 +70,11 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     var selected: MelodyNote? { activeTrack?.notes.first { $0.id == selectedID } }
+
+    var canSlurSelectedNote: Bool {
+        guard let note = selected else { return false }
+        return activeTrack?.notes.contains { $0.end == note.start && Voicebank.kana($0.lyric) != "っ" } == true
+    }
 
     func loadProjectLibrary() {
         guard !didLoadProjectLibrary else { return }
@@ -98,10 +120,46 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
     }
 
+    func importArrangement(_ url: URL, format: ProjectInterchange) async {
+        guard !isBusy else { return }
+        isHandlingProjectFile = true
+        defer { isHandlingProjectFile = false }
+        do {
+            let result = try await Task.detached(priority: .userInitiated) {
+                try format.decode(ProjectLibrary.coordinatedRead(url))
+            }.value
+            let rawName = url.deletingPathExtension().lastPathComponent
+            let cleanName = rawName.components(separatedBy: .controlCharacters).joined()
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            let name = cleanName.isEmpty ? "导入的旋律" : String(cleanName.prefix(64))
+            let document = ProjectDocument(name: name, melody: result.melody)
+            try installProject(LocalProject(document: document), url: nil)
+            if !result.warnings.isEmpty { importNotice = result.warnings.joined(separator: "\n") }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func exportArrangement(_ format: ProjectInterchange) async -> Data? {
+        guard !isBusy, let record = currentProject else { return nil }
+        isHandlingProjectFile = true
+        defer { isHandlingProjectFile = false }
+        let trackID = activeTrack?.id
+        do {
+            return try await Task.detached(priority: .userInitiated) {
+                try format.encode(record.document.melody, title: record.document.name, selectedTrackID: trackID)
+            }.value
+        } catch {
+            errorMessage = error.localizedDescription
+            return nil
+        }
+    }
+
     func showWelcome() {
         guard !isBusy else { return }
         do {
             if let currentProject { try ProjectLibrary.save(currentProject) }
+            autosaveTask?.cancel()
             recentProjects = try ProjectLibrary.recent()
             invalidateAudio()
             previewPlayer?.stop()
@@ -157,12 +215,13 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         var next = record
         next.updatedAt = Date()
         try ProjectLibrary.save(next)
+        autosaveTask?.cancel()
 
         invalidateAudio()
         previewPlayer?.stop()
         project = next.document.melody
         activeTrackID = project.tracks.first?.id
-        selectedID = nil
+        clearSelection()
         entryStep = 0
         transportStep = 0
         undoHistory.removeAll()
@@ -174,35 +233,65 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     var entryLocation: String {
-        guard entryStep < MelodyProject.steps else { return "已到曲尾" }
+        guard entryStep < project.steps else { return "已到曲尾" }
         let bar = entryStep / MelodyProject.stepsPerBar + 1
         let beat = entryStep % MelodyProject.stepsPerBar / MelodyProject.stepsPerBeat + 1
         let subdivision = entryStep % MelodyProject.stepsPerBeat
-        let position = "第\(bar)小节 第\(beat)拍" + (subdivision == 0 ? "" : " +\(subdivision)/4拍")
+        let position = "第\(bar)小节 第\(beat)拍" + (subdivision == 0 ? "" : " +\(subdivision) tick")
         let isInsideNote = activeTrack?.notes.contains { $0.start < entryStep && entryStep < $0.end } ?? false
         return isInsideNote ? "\(position) · 音符内" : position
     }
 
     func moveEntryCursor(to step: Int) {
-        entryStep = min(MelodyProject.steps, max(0, step))
+        entryStep = min(project.steps, max(0, step))
     }
 
     func seek(to step: Int) {
-        transportStep = min(MelodyProject.steps - 1, max(0, step))
-        if let player = songPlayer, isPlaying {
-            player.currentTime = transportTime(duration: player.duration)
-        }
+        transportStep = min(project.steps - 1, max(0, step))
+        guard let player = songPlayer, let region = playingRegion else { return }
+        if region.contains(transportStep) { player.currentTime = transportTime(duration: player.duration, region: region) }
+        else { stop() }
     }
 
-    private func transportTime(duration: TimeInterval) -> TimeInterval {
-        duration * Double(transportStep) / Double(MelodyProject.steps)
+    private func transportTime(duration: TimeInterval, region: Range<Int>) -> TimeInterval {
+        let offset = region.contains(transportStep) ? transportStep - region.lowerBound : 0
+        return duration * Double(offset) / Double(region.count)
+    }
+
+    func resizeProject(to bars: Int) {
+        guard (1...MelodyProject.maxBars).contains(bars), bars != project.barCount else { return }
+        if project.tracks.contains(where: { $0.notes.contains { $0.end > bars * MelodyProject.stepsPerBar } }) {
+            errorMessage = "曲尾仍有音符，请先移动或删除这些音符。"
+            return
+        }
+        var updated = project
+        updated.barCount = bars
+        if let loop = updated.loopRegion, loop.endBar > bars {
+            updated.loopRegion = loop.firstBar < bars ? MeasureLoop(firstBar: loop.firstBar, endBar: bars) : nil
+        }
+        update(updated)
+    }
+
+    func setLoop(firstBar: Int, endBar: Int) {
+        guard firstBar >= 0, endBar <= project.barCount, firstBar < endBar else { return }
+        var updated = project
+        updated.loopRegion = MeasureLoop(firstBar: firstBar, endBar: endBar)
+        update(updated)
+        loops = true
+        seek(to: firstBar * MelodyProject.stepsPerBar)
+    }
+
+    func clearLoop() {
+        var updated = project
+        updated.loopRegion = nil
+        update(updated)
     }
 
     func selectTrack(_ id: UUID) {
         guard activeTrack?.id != id, project.tracks.contains(where: { $0.id == id }) else { return }
         finishLyricEdit()
         activeTrackID = id
-        selectedID = nil
+        clearSelection()
     }
 
     func addTrack() {
@@ -229,27 +318,84 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         update(updated)
     }
 
-    func select(_ note: MelodyNote) {
+    func updateTrack(_ id: UUID, name: String, volume: Double) {
+        guard let index = project.tracks.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard MelodyTrack.isValidName(trimmed), (0...2).contains(volume) else {
+            errorMessage = "请输入1至32个字符的音轨名称和有效音量。"
+            return
+        }
+        var updated = project
+        updated.tracks[index].name = trimmed
+        updated.tracks[index].volume = volume
+        update(updated)
+    }
+
+    func duplicateTrack(_ id: UUID) {
+        guard project.tracks.count < MelodyProject.maxTracks,
+              let index = project.tracks.firstIndex(where: { $0.id == id }) else { return }
+        var copy = project.tracks[index]
+        copy.id = UUID()
+        copy.name = String(copy.name.prefix(29)) + " 副本"
+        copy.isSolo = false
+        for index in copy.notes.indices { copy.notes[index].id = UUID() }
+        var updated = project
+        updated.tracks.insert(copy, at: index + 1)
+        update(updated)
+        selectTrack(copy.id)
+    }
+
+    func moveTrack(_ id: UUID, by offset: Int) {
+        guard let index = project.tracks.firstIndex(where: { $0.id == id }),
+              project.tracks.indices.contains(index + offset) else { return }
+        var updated = project
+        updated.tracks.swapAt(index, index + offset)
+        update(updated)
+    }
+
+    func removeTrack(_ id: UUID) {
+        guard project.tracks.count > 1, let index = project.tracks.firstIndex(where: { $0.id == id }) else { return }
+        var updated = project
+        updated.tracks.remove(at: index)
+        update(updated)
+        if activeTrackID == id {
+            activeTrackID = updated.tracks[min(index, updated.tracks.count - 1)].id
+            clearSelection()
+        }
+    }
+
+    func clearSelection() {
+        setSelection([])
+    }
+
+    func setSelection(_ ids: Set<UUID>, primary: UUID? = nil) {
         finishLyricEdit()
-        selectedID = note.id
+        let selection = (activeTrack?.notes ?? []).filter { ids.contains($0.id) }
+        selectedIDs = Set(selection.map(\.id))
+        if let primary, selectedIDs.contains(primary) { selectedID = primary }
+        else { selectedID = selection.min(by: { $0.start < $1.start })?.id }
+    }
+
+    func select(_ note: MelodyNote) {
+        setSelection([note.id], primary: note.id)
         moveEntryCursor(to: note.start)
         audition(pitch: note.pitch)
     }
 
     func add(start: Int, pitch: Int) {
-        guard let note = activeTrack?.newNote(at: start, pitch: pitch), place(note) else { return }
+        guard let note = activeTrack?.newNote(at: start, pitch: pitch, limit: project.steps), place(note) else { return }
         select(note)
     }
 
     func enterNote(pitch: Int) {
-        guard let note = activeTrack?.noteForKeyboard(at: entryStep, pitch: pitch), place(note) else { return }
-        selectedID = note.id
+        guard let note = activeTrack?.noteForKeyboard(at: entryStep, pitch: pitch, limit: project.steps), place(note) else { return }
+        setSelection([note.id], primary: note.id)
         moveEntryCursor(to: note.end)
     }
 
     @discardableResult
     func place(_ note: MelodyNote, lyricEdit: UUID? = nil) -> Bool {
-        guard let track = activeTrack, track.canPlace(note),
+        guard let track = activeTrack, track.canPlace(note, limit: project.steps),
               let index = project.tracks.firstIndex(where: { $0.id == track.id }) else { return false }
         var updated = project
         if let noteIndex = track.notes.firstIndex(where: { $0.id == note.id }) {
@@ -261,9 +407,59 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         return true
     }
 
+    func copySelection() {
+        guard let track = activeTrack, !selectedIDs.isEmpty else { return }
+        copiedNotes = track.notes.filter { selectedIDs.contains($0.id) }.sorted { $0.start < $1.start }
+        hasCopiedNotes = !copiedNotes.isEmpty
+    }
+
+    func pasteNotes() {
+        guard let origin = copiedNotes.first?.start else { return }
+        let notes = copiedNotes.map { note in
+            var copy = note
+            copy.id = UUID()
+            copy.start = entryStep + note.start - origin
+            return copy
+        }
+        if replaceNotes(notes) { setSelection(Set(notes.map(\.id))) }
+    }
+
+    @discardableResult
+    func replaceNotes(_ notes: [MelodyNote], reportError: Bool = true) -> Bool {
+        guard let track = activeTrack, let index = project.tracks.firstIndex(where: { $0.id == track.id }) else { return false }
+        let ids = Set(notes.map(\.id))
+        var updated = project
+        updated.tracks[index].notes.removeAll { ids.contains($0.id) }
+        updated.tracks[index].notes += notes
+        guard updated.tracks[index].isValid(limit: project.steps) else {
+            if reportError { errorMessage = "音符会重叠或超出曲尾，请调整位置后重试。" }
+            return false
+        }
+        update(updated)
+        return true
+    }
+
+    func transposeSelection(by semitones: Int) {
+        guard let track = activeTrack, !selectedIDs.isEmpty else { return }
+        let notes = track.notes.filter { selectedIDs.contains($0.id) }.map { note in
+            var updated = note
+            updated.pitch += semitones
+            return updated
+        }
+        _ = replaceNotes(notes)
+    }
+
+    func updateExpression(_ expression: NoteExpression, noteID: UUID, trackID: UUID) {
+        guard activeTrack?.id == trackID, let track = activeTrack,
+              var note = track.notes.first(where: { $0.id == noteID }), expression.isValid else { return }
+        note.expression = expression
+        _ = place(note)
+    }
+
     func setLyric(_ text: String) {
         guard var note = selected else { return }
         note.lyric = String(text.prefix(12))
+        note.expression.slur = false
         place(note, lyricEdit: note.id)
     }
 
@@ -279,6 +475,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         for noteIndex in track.notes.indices {
             if let lyric = replacements[track.notes[noteIndex].id] {
                 updated.tracks[index].notes[noteIndex].lyric = lyric
+                updated.tracks[index].notes[noteIndex].expression.slur = false
             }
         }
         update(updated)
@@ -289,12 +486,12 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     func deleteSelected() {
-        guard let selectedID, let track = activeTrack,
+        guard !selectedIDs.isEmpty, let track = activeTrack,
               let index = project.tracks.firstIndex(where: { $0.id == track.id }) else { return }
         var updated = project
-        updated.tracks[index].notes.removeAll { $0.id == selectedID }
+        updated.tracks[index].notes.removeAll { selectedIDs.contains($0.id) }
         update(updated)
-        self.selectedID = nil
+        clearSelection()
     }
 
     func setTempo(_ tempo: Int) {
@@ -304,7 +501,8 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     private var editSnapshot: EditSnapshot {
-        EditSnapshot(project: project, selectedID: selectedID, activeTrackID: activeTrack?.id, entryStep: entryStep)
+        EditSnapshot(project: project, selectedID: selectedID, selectedIDs: selectedIDs,
+                     activeTrackID: activeTrack?.id, entryStep: entryStep)
     }
 
     func undo() {
@@ -323,7 +521,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         finishLyricEdit()
         apply(snapshot.project)
         activeTrackID = snapshot.activeTrackID ?? project.tracks.first?.id
-        selectedID = snapshot.selectedID
+        setSelection(snapshot.selectedIDs, primary: snapshot.selectedID)
         moveEntryCursor(to: snapshot.entryStep)
     }
 
@@ -346,10 +544,30 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         active.document.melody = value
         active.updatedAt = Date()
         currentProject = active
+        moveEntryCursor(to: entryStep)
+        transportStep = min(project.steps - 1, transportStep)
         saveStatus = nil
         invalidateAudio()
+        autosaveTask?.cancel()
+        autosaveTask = Task {
+            do {
+                try await Task.sleep(for: .milliseconds(300))
+                autosaveTask = nil
+                try ProjectLibrary.save(active)
+            } catch is CancellationError {
+                return
+            } catch {
+                errorMessage = "旋律保存失败。\(error.localizedDescription)"
+            }
+        }
+    }
+
+    func flushAutosave() {
+        guard let autosaveTask, let currentProject else { return }
+        autosaveTask.cancel()
+        self.autosaveTask = nil
         do {
-            try ProjectLibrary.save(active)
+            try ProjectLibrary.save(currentProject)
         } catch {
             errorMessage = "旋律保存失败。\(error.localizedDescription)"
         }
@@ -381,27 +599,31 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         }
     }
 
-    func renderedAudio() async -> Data? {
+    func renderedAudio(window: Range<Int>? = nil, trackID: UUID? = nil) async -> Data? {
         guard !isBusy, let projectID = currentProject?.id else { return nil }
-        if let cache { return cache }
+        let request = RenderRequest(window: window, trackID: trackID)
+        if let cache, cache.request == request { return cache.data }
         guard let bank else {
             errorMessage = StudioError.noVoicebank.localizedDescription
             return nil
         }
         let snapshot = project
         isRendering = true
-        defer { isRendering = false }
+        let task = Task.detached(priority: .userInitiated) {
+            try MelodyAudio.render(snapshot, bank: bank, window: window, trackID: trackID)
+        }
+        renderTask = task
+        defer {
+            isRendering = false
+            renderTask = nil
+        }
         do {
-            let data = try await Task.detached(priority: .userInitiated) {
-                try MelodyAudio.render(snapshot, bank: bank)
-            }.value
-            guard currentProject?.id == projectID else { return nil }
-            guard project == snapshot, self.bank?.id == bank.id else {
-                errorMessage = "合成期间旋律或音源有更新，请重新试听或导出。"
-                return nil
-            }
-            cache = data
+            let data = try await task.value
+            guard currentProject?.id == projectID, project == snapshot, self.bank?.id == bank.id else { return nil }
+            if data.count <= 32 * 1_048_576 { cache = (request, data) }
             return data
+        } catch is CancellationError {
+            return nil
         } catch {
             if project == snapshot { errorMessage = error.localizedDescription }
             return nil
@@ -413,17 +635,20 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             stop()
             return
         }
-        guard let data = await renderedAudio() else { return }
+        let window = loops ? project.loopRegion?.ticks : nil
+        let region = window ?? 0..<project.steps
+        guard let data = await renderedAudio(window: window), window == (loops ? project.loopRegion?.ticks : nil) else { return }
         do {
             try AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
             try AVAudioSession.sharedInstance().setActive(true)
             let player = try AVAudioPlayer(data: data)
             player.numberOfLoops = loops ? -1 : 0
-            player.currentTime = transportTime(duration: player.duration)
+            player.currentTime = transportTime(duration: player.duration, region: region)
             player.delegate = self
             previewPlayer?.stop()
             guard player.play() else { throw StudioError.playback }
             songPlayer = player
+            playingRegion = region
             isPlaying = true
         } catch {
             errorMessage = error.localizedDescription
@@ -433,6 +658,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     func stop() {
         songPlayer?.stop()
         songPlayer = nil
+        playingRegion = nil
         isPlaying = false
     }
 
@@ -452,6 +678,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     private func invalidateAudio() {
         cache = nil
+        renderTask?.cancel()
         stop()
     }
 

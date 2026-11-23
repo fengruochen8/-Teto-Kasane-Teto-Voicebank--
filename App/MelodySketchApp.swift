@@ -15,13 +15,26 @@ struct StudioView: View {
     let onSave: () -> Void
     let onSaveAs: () -> Void
     let onImportVoicebank: () -> Void
-    let onExportWave: () -> Void
+    let onExportWave: (UUID?) -> Void
+    let onImportArrangement: () -> Void
+    let onExportArrangement: (ProjectInterchange) -> Void
     @State private var tool = PianoRollTool.select
     @State private var snap = GridSnap.sixteenth
     @FocusState private var editingLyric: Bool
     @State private var keyboardExpanded = false
     @State private var keyboardMode = PianoKeyboardMode.audition
     @State private var batchLyricsRequest: BatchLyricsRequest?
+    @State private var expressionRequest: ExpressionRequest?
+    @State private var editingLength = false
+    @State private var draftLength = 4
+
+    private struct ExpressionRequest: Identifiable {
+        let note: MelodyNote
+        let trackID: UUID
+        let canSlur: Bool
+
+        var id: UUID { note.id }
+    }
 
     private struct BatchLyricsRequest: Identifiable {
         let projectID: UUID
@@ -59,6 +72,11 @@ struct StudioView: View {
                 model.applyBatchLyrics(replacements, to: request.track, in: request.projectID)
             }
         }
+        .sheet(item: $expressionRequest) { request in
+            NoteExpressionSheet(trackID: request.trackID, note: request.note, canSlur: request.canSlur) { expression in
+                model.updateExpression(expression, noteID: request.note.id, trackID: request.trackID)
+            }
+        }
         .onChange(of: editingLyric) { _, editing in
             if !editing { model.finishLyricEdit() }
         }
@@ -76,7 +94,7 @@ struct StudioView: View {
             ViewThatFits(in: .horizontal) {
                 HStack(alignment: .top, spacing: 12) {
                     TrackPanel(model: model)
-                        .frame(width: 210)
+                        .frame(width: 224)
                     roll.frame(minWidth: 420)
                 }
                 VStack(spacing: 10) {
@@ -124,6 +142,16 @@ struct StudioView: View {
                 Button("新建工程", systemImage: "plus", action: onNew)
                 Button("打开工程", systemImage: "folder", action: onOpen)
                 Button("另存为", systemImage: "doc.on.doc", action: onSaveAs)
+                Divider()
+                Button("导入 MIDI／UST／USTX", systemImage: "tray.and.arrow.down", action: onImportArrangement)
+                Menu {
+                    Button("MIDI（全部音轨）") { onExportArrangement(.midi) }
+                    Button("UST（当前音轨）") { onExportArrangement(.ust) }
+                    Button("USTX（全部音轨）") { onExportArrangement(.ustx) }
+                } label: {
+                    Label("导出乐谱", systemImage: "square.and.arrow.up")
+                }
+                .disabled(model.project.noteCount == 0)
             } label: {
                 Label("工程", systemImage: "doc")
                     .font(.subheadline.weight(.semibold))
@@ -169,7 +197,7 @@ struct StudioView: View {
         HStack(spacing: 12) {
             Button("回到开头", systemImage: "backward.end.fill") {
                 model.seek(to: 0)
-                if keyboardExpanded && keyboardMode == .entry { model.moveEntryCursor(to: 0) }
+                model.moveEntryCursor(to: 0)
             }
             .buttonStyle(StudioButtonStyle())
             .labelStyle(.iconOnly)
@@ -185,9 +213,20 @@ struct StudioView: View {
             }
             .toggleStyle(.button)
 
-            Button("导出 WAV", systemImage: "square.and.arrow.up", action: onExportWave)
-                .buttonStyle(StudioButtonStyle())
-                .disabled(model.isBusy)
+            Menu {
+                Button("导出混音 WAV", systemImage: "waveform") { onExportWave(nil) }
+                if let track = model.activeTrack {
+                    Button("导出「\(track.name)」WAV", systemImage: "music.note") { onExportWave(track.id) }
+                        .disabled(track.notes.isEmpty)
+                }
+            } label: {
+                Label("导出 WAV", systemImage: "square.and.arrow.up")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 40)
+                    .studioPanel(radius: 10)
+            }
+            .disabled(model.isBusy || model.project.noteCount == 0)
 
             if model.isRendering { ProgressView("合成中").controlSize(.small) }
         }
@@ -211,16 +250,32 @@ struct StudioView: View {
                 toolPicker
                 historyButtons
                 batchLyricsButton
-                Spacer(minLength: 10)
+                editMenu
+                Spacer(minLength: 8)
+                timelineMenu
                 snapPicker
             }
             VStack(alignment: .leading, spacing: 8) {
                 HStack(spacing: 12) {
                     toolPicker
                     historyButtons
-                    batchLyricsButton.labelStyle(.iconOnly)
+                    editMenu
                 }
-                snapPicker
+                ViewThatFits(in: .horizontal) {
+                    HStack(spacing: 12) {
+                        batchLyricsButton
+                        timelineMenu
+                        snapPicker
+                    }
+                    VStack(alignment: .leading, spacing: 7) {
+                        HStack(spacing: 12) {
+                            batchLyricsButton
+                            timelineMenu
+                        }
+                        snapPicker
+                    }
+                }
+                .controlSize(.small)
             }
         }
         .padding(.horizontal, 8)
@@ -231,9 +286,9 @@ struct StudioView: View {
     private var toolPicker: some View {
         StudioSegments(
             selection: $tool, label: "编辑工具",
-            options: [(PianoRollTool.select, "选择"), (PianoRollTool.draw, "画笔")]
+            options: [(PianoRollTool.select, "选择"), (.draw, "画笔"), (.box, "框选"), (.pan, "移动")]
         )
-        .frame(width: 144)
+        .frame(width: 206)
     }
 
     private var historyButtons: some View {
@@ -270,16 +325,90 @@ struct StudioView: View {
                 .foregroundStyle(StudioTheme.muted)
             StudioSegments(
                 selection: $snap, label: "网格吸附",
-                options: GridSnap.allCases.map { ($0, "1/\(16 / $0.rawValue)") }
+                options: GridSnap.allCases.map { ($0, $0.label) }
             )
             .frame(width: 156)
         }
         .fixedSize()
     }
 
+    private var editMenu: some View {
+        Menu {
+            Button("复制音符", systemImage: "doc.on.doc", action: model.copySelection)
+                .keyboardShortcut("c", modifiers: .command)
+                .disabled(model.selectedIDs.isEmpty)
+            Button("粘贴到录入光标", systemImage: "clipboard", action: model.pasteNotes)
+                .keyboardShortcut("v", modifiers: .command)
+                .disabled(!model.hasCopiedNotes)
+            Menu {
+                Button("升高半音") { model.transposeSelection(by: 1) }
+                Button("降低半音") { model.transposeSelection(by: -1) }
+                Button("升高八度") { model.transposeSelection(by: 12) }
+                Button("降低八度") { model.transposeSelection(by: -12) }
+            } label: {
+                Label("移调", systemImage: "arrow.up.and.down")
+            }
+            .disabled(model.selectedIDs.isEmpty)
+            Button("删除选中音符", systemImage: "trash", role: .destructive, action: model.deleteSelected)
+                .disabled(model.selectedIDs.isEmpty)
+        } label: {
+            Image(systemName: "ellipsis.circle")
+                .frame(width: 38, height: 38)
+                .studioPanel(radius: 9)
+                .accessibilityLabel("音符编辑菜单")
+        }
+    }
+
+    private var timelineMenu: some View {
+        Menu {
+            Button("追加4小节", systemImage: "plus") {
+                model.resizeProject(to: min(MelodyProject.maxBars, model.project.barCount + 4))
+            }
+            .disabled(model.project.barCount >= MelodyProject.maxBars)
+            Button("设置小节数", systemImage: "ruler") {
+                draftLength = model.project.barCount
+                editingLength = true
+            }
+            if let loop = model.project.loopRegion {
+                Button("清除第\(loop.firstBar + 1)至\(loop.endBar)小节循环", systemImage: "repeat", action: model.clearLoop)
+            }
+        } label: {
+            Label("\(model.project.barCount)小节", systemImage: "ruler")
+                .font(.subheadline.weight(.semibold))
+                .padding(.horizontal, 7)
+                .frame(minHeight: 38)
+                .studioPanel(radius: 9)
+                .lineLimit(1)
+        }
+        .popover(isPresented: $editingLength) {
+            VStack(alignment: .leading, spacing: 14) {
+                Stepper(value: $draftLength, in: 1...MelodyProject.maxBars) {
+                    Text("\(draftLength)小节").monospacedDigit()
+                }
+                HStack {
+                    Button("取消") { editingLength = false }
+                    Spacer()
+                    Button("应用") {
+                        editingLength = false
+                        model.resizeProject(to: draftLength)
+                    }
+                    .buttonStyle(StudioButtonStyle(prominent: true))
+                }
+            }
+            .padding(18)
+            .frame(minWidth: 240)
+        }
+    }
+
     private var noteInspector: some View {
         HStack(spacing: 12) {
-            if let note = model.selected {
+            if model.selectedIDs.count > 1 {
+                Text("已选\(model.selectedIDs.count)个音符")
+                    .font(.subheadline.weight(.semibold))
+                Button("复制", systemImage: "doc.on.doc", action: model.copySelection)
+                    .buttonStyle(StudioButtonStyle())
+                Spacer(minLength: 0)
+            } else if let note = model.selected {
                 Text(MelodyProject.noteName(note.pitch))
                     .font(.system(.subheadline, design: .monospaced).weight(.semibold))
                     .frame(minWidth: 44)
@@ -298,17 +427,24 @@ struct StudioView: View {
                 .accessibilityLabel("音符假名")
                 .frame(width: 104)
                 .id(note.id)
+                .disabled(note.expression.slur)
                 Stepper("音高", onIncrement: { move(.pitch, by: 1) }, onDecrement: { move(.pitch, by: -1) })
                     .fixedSize()
-                Stepper("时值", onIncrement: { move(.length, by: 1) }, onDecrement: { move(.length, by: -1) })
+                Stepper("时值", onIncrement: { move(.length, by: snap.rawValue) }, onDecrement: { move(.length, by: -snap.rawValue) })
                     .fixedSize()
+                Button("调校", systemImage: "waveform.path") {
+                    guard let track = model.activeTrack else { return }
+                    editingLyric = false
+                    expressionRequest = ExpressionRequest(note: note, trackID: track.id, canSlur: model.canSlurSelectedNote)
+                }
+                .buttonStyle(StudioButtonStyle())
                 Spacer(minLength: 0)
                 Button("删除音符", systemImage: "trash", role: .destructive) { model.deleteSelected() }
                     .buttonStyle(.borderless)
                     .labelStyle(.iconOnly)
                     .accessibilityLabel("删除音符")
             } else {
-                Text(tool == .select ? "点选音符编辑。点上方时间尺定位播放。" : "点空白网格添加音符，拖动可设置时值。")
+                Text(toolHint)
                     .font(.subheadline)
                     .foregroundStyle(StudioTheme.muted)
                 Spacer()
@@ -318,9 +454,19 @@ struct StudioView: View {
         .padding(.horizontal, 4)
     }
 
+    private var toolHint: String {
+        switch tool {
+        case .select: return "点选音符编辑，拖动时间尺设置循环。"
+        case .draw: return "点空白网格添加音符，拖动设置时值。"
+        case .box: return "在网格上拖出范围，框选多个音符。"
+        case .pan: return "拖动浏览旋律，双指缩放时间轴。"
+        }
+    }
+
     private func move(_ key: WritableKeyPath<MelodyNote, Int>, by offset: Int) {
         guard var note = model.selected else { return }
         note[keyPath: key] += offset
+        if key == \.length { note.length = max(1, note.length) }
         if model.place(note), key == \MelodyNote.pitch { model.audition(pitch: note.pitch) }
     }
 }

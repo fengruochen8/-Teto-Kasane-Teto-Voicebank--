@@ -104,3 +104,100 @@ extern "C" int32_t teto_render_note(const float* source, int32_t sourceFrames,
     }
     return 0;
 }
+
+namespace {
+
+class PitchEnvelope {
+public:
+    PitchEnvelope(const TetoPitchPoint* points, int32_t count, int32_t sampleRate)
+        : points_(points), count_(count), sampleRate_(sampleRate) {}
+
+    void advanceTo(int32_t frame) {
+        while (position_ < frame) {
+            const auto& left = points_[index_];
+            const double low = std::clamp<double>(left.hz, 8, sampleRate_ * 0.42);
+            int32_t end = frame;
+            double slope = 0;
+            if (index_ + 1 < count_) {
+                const auto& right = points_[index_ + 1];
+                end = std::min(frame, right.frame);
+                const double high = std::clamp<double>(right.hz, 8, sampleRate_ * 0.42);
+                slope = (high - low) / (right.frame - left.frame);
+            }
+            const double length = end - position_;
+            const double initial = low + slope * (position_ - left.frame);
+            phase_ += (initial * length + slope * length * (length - 1) / 2) / sampleRate_;
+            phase_ -= std::floor(phase_);
+            position_ = end;
+            if (index_ + 1 < count_ && end == points_[index_ + 1].frame) { ++index_; }
+        }
+    }
+
+    float phase() const { return static_cast<float>(phase_); }
+
+private:
+    const TetoPitchPoint* points_;
+    int32_t count_;
+    int32_t sampleRate_;
+    int32_t index_ = 0;
+    int32_t position_ = 0;
+    double phase_ = 0;
+};
+
+} // namespace
+
+extern "C" int32_t teto_note_period(const float* source, int32_t sourceFrames, int32_t sampleRate, int32_t fixedFrames) {
+    if (!source || fixedFrames < 0 || fixedFrames >= sourceFrames || sampleRate < 8000 || sampleRate > 192000) { return 0; }
+    return EstimatePeriod(source + fixedFrames, sourceFrames - fixedFrames, sampleRate);
+}
+
+extern "C" int32_t teto_mix_note_curve(const float* source, int32_t sourceFrames, int32_t sampleRate,
+    int32_t fixedFrames, int32_t sourcePeriod, const TetoPitchPoint* points, int32_t pointCount,
+    int32_t noteFrames, int32_t cropStart, float gain, float* mix, int32_t mixFrames) {
+    if (!source || !mix || !points || pointCount < 1 || points[0].frame != 0 ||
+        sampleRate < 8000 || sampleRate > 192000 || sourceFrames <= 0 || noteFrames <= 0 ||
+        fixedFrames < 0 || fixedFrames > std::min(sourceFrames, noteFrames) ||
+        sourcePeriod < 0 || sourcePeriod > sourceFrames - fixedFrames ||
+        cropStart < 0 || cropStart >= noteFrames || mixFrames <= 0 || mixFrames > noteFrames - cropStart ||
+        !std::isfinite(gain)) {
+        return 1;
+    }
+    for (int32_t i = 0; i < pointCount; ++i) {
+        if (!std::isfinite(points[i].hz) || points[i].hz <= 0 || points[i].frame >= noteFrames ||
+            (i > 0 && points[i].frame <= points[i - 1].frame)) { return 1; }
+    }
+
+    const int32_t vowelFrames = sourceFrames - fixedFrames;
+    const int32_t sustainFrames = noteFrames - fixedFrames;
+    const int32_t seam = std::min({sampleRate / 200, sustainFrames, fixedFrames});
+    const int32_t onset = sampleRate / 500;
+    const int32_t tail = std::min(sampleRate / 150, noteFrames);
+    const float* vowel = source + fixedFrames;
+    const float* cycle = vowel + (vowelFrames - sourcePeriod) / 2;
+    const float unvoicedStep = static_cast<float>(std::max(0, vowelFrames - 1)) / std::max(1, sustainFrames - 1);
+    PitchEnvelope pitch(points, pointCount, sampleRate);
+
+    for (int32_t i = 0; i < mixFrames; ++i) {
+        const int32_t frame = cropStart + i;
+        float value = 0;
+        if (frame < fixedFrames) {
+            value = source[frame];
+        } else {
+            const int32_t position = frame - fixedFrames;
+            if (sourcePeriod > 0) {
+                pitch.advanceTo(frame);
+                value = Interpolate(cycle, sourcePeriod, pitch.phase() * sourcePeriod, true);
+            } else if (vowelFrames > 0) {
+                value = Interpolate(vowel, vowelFrames, std::min<float>(vowelFrames - 1, position * unvoicedStep), false);
+            }
+            if (position < seam) {
+                const float blend = static_cast<float>(position + 1) / (seam + 1);
+                value = value * blend + source[fixedFrames - seam + position] * (1 - blend);
+            }
+        }
+        const float fadeIn = std::min(1.0f, static_cast<float>(frame) / onset);
+        const float fadeOut = std::min(1.0f, static_cast<float>(noteFrames - frame - 1) / tail);
+        mix[i] += value * gain * fadeIn * fadeOut;
+    }
+    return 0;
+}
