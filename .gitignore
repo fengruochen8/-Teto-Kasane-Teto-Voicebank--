@@ -6,3 +6,7 @@ xcuserdata/
 *.zip
 *.wav
 *.ipa
+
+# Official character art for the local personal build.
+/App/Assets.xcassets/TetoWelcomeIllustration.imageset/
+/LocalArtwork/

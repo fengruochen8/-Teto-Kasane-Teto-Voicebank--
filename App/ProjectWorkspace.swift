@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 import UniformTypeIdentifiers
 
 private extension UTType {
@@ -189,6 +190,8 @@ struct ProjectWorkspace: View {
 
 @MainActor
 private struct WelcomeView: View {
+    private static let officialArt = UIImage(named: "TetoWelcomeIllustration")
+
     let projects: [LocalProject]
     let onNew: () -> Void
     let onOpen: () -> Void
@@ -258,18 +261,44 @@ private struct WelcomeView: View {
     }
 
     private var heroIllustration: some View {
-        Image("WelcomeIllustration")
-            .resizable()
-            .scaledToFill()
-            .overlay(alignment: .leading) {
-                LinearGradient(
-                    colors: [StudioTheme.surface.opacity(0.85), .clear],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-                .allowsHitTesting(false)
+        ZStack(alignment: .bottomTrailing) {
+            LinearGradient(
+                colors: [StudioTheme.surface, StudioTheme.raised, Color(red: 0.32, green: 0.13, blue: 0.25)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+            RadialGradient(
+                colors: [StudioTheme.accent.opacity(0.24), .clear],
+                center: .trailing,
+                startRadius: 5,
+                endRadius: 240
+            )
+            if let officialArt = Self.officialArt {
+                GeometryReader { geometry in
+                    let artHeight = geometry.size.height * 2.35
+                    Image(uiImage: officialArt)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geometry.size.width * 0.88, height: artHeight)
+                        .position(x: geometry.size.width * 0.60, y: artHeight / 2 + 6)
+                        .accessibilityHidden(true)
+                }
+                Text("重音テト © 線／小山乃舞世／TWINDRILL")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(StudioTheme.ink)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(StudioTheme.background.opacity(0.90), in: Capsule())
+                    .padding(10)
+            } else {
+                Image(systemName: "waveform")
+                    .font(.system(size: 49, weight: .light))
+                    .foregroundStyle(StudioTheme.secondary.opacity(0.75))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .accessibilityHidden(true)
             }
-            .accessibilityHidden(true)
+        }
+        .clipped()
     }
 
     private var newCard: some View {

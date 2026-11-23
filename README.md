@@ -17,6 +17,10 @@ xcodebuild -project TetoMelody.xcodeproj -scheme TetoMelody \
 
 编辑页的「保存」在第一次使用时会让你选文件位置，已打开或已保存的工程可以通过「保存」更新原文件。「工程」菜单提供「另存为」，可以选新位置或文件名。一份 .tetomelody 只保存旋律、速度和歌词，换设备打开后需要在该设备导入音源。
 
+## 欢迎页插画
+
+个人构建使用[重音Teto官网配布的角色插画](https://kasaneteto.jp/illust-logo/)，原图保存在本地的 `LocalArtwork`。Xcode 读取本地的 `App/Assets.xcassets/TetoWelcomeIllustration.imageset`，资源按[角色使用条款](https://kasaneteto.jp/guideline/character.html)用于个人非商用构建。图片著作权标注为重音テト © 線／小山乃舞世／TWINDRILL。单独从 Git 获取的工程默认显示波形图标。
+
 ## 使用
 
 1. 在[重音Teto官网](https://kasaneteto.jp/utau/)选择「通常音源 単独音」并将 `TETO-tandoku-100619.zip` 保存到 iPad 的「文件」。在 App 中选「导入音源 ZIP」。
