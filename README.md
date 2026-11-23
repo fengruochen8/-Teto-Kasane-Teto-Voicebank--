@@ -4,6 +4,8 @@
 
 ## 运行
 
+在 Mac 上接续开发或进行真机测试时，先看[开发与验收交接](docs/MAC_HANDOFF.md)。
+
 需要安装了 Xcode 16或更高版本的 Mac，支持 iPadOS 17及以上。打开 `TetoMelody.xcodeproj`，选中 `TetoMelody` scheme 和一台 iPad 模拟器即可运行。安装到 iPad 时，在目标的 Signing & Capabilities 中选择团队，并选择已启用开发者模式的设备。Xcode 首次构建会获取固定版本的 ZIPFoundation、MeCab／IPADic 和 Yams。
 
 ```sh
