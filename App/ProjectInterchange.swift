@@ -74,7 +74,7 @@ extension ProjectInterchange {
                 let start = ticks(fromStep: note.start)
                 let end = ticks(fromStep: note.end)
                 let lyric = safeText(note.lyric)
-                if !lyric.isEmpty { events.append(MIDIEvent(time: start, bytes: metaEvent(0x05, text: lyric))) }
+                events.append(MIDIEvent(time: start, bytes: metaEvent(0x05, text: lyric)))
                 let channel = UInt8(trackIndex % 16)
                 events.append(MIDIEvent(time: start, bytes: [0x90 | channel, UInt8(note.pitch), 100]))
                 events.append(MIDIEvent(time: end, bytes: [0x80 | channel, UInt8(note.pitch), 0]))
@@ -297,7 +297,7 @@ extension ProjectInterchange {
         let parts: [[String: Any]] = melody.tracks.enumerated().map { index, track in
             let notes: [[String: Any]] = track.notes.sorted(by: noteOrder).map { note in
                 ["position": ticks(fromStep: note.start), "duration": ticks(fromStep: note.length),
-                 "tone": note.pitch, "lyric": note.lyric]
+                 "tone": note.pitch, "lyric": note.expression.slur ? "+" : note.lyric]
             }
             return ["name": track.name, "track_no": index, "position": 0,
                     "duration": ticks(fromStep: melody.steps), "notes": notes]
@@ -402,7 +402,16 @@ extension ProjectInterchange {
                     warnings.append("超过 \(MelodyProject.maxTracks) 条音轨的内容未导入。")
                     break
                 }
-                let limited = Array(lane.prefix(MelodyProject.maxNotesPerTrack))
+                var limited = Array(lane.prefix(MelodyProject.maxNotesPerTrack))
+                for index in limited.indices where limited[index].lyric == "+" {
+                    if index > 0, limited[index - 1].end == limited[index].start,
+                       limited[index - 1].lyric != "っ" {
+                        limited[index].expression.slur = true
+                    } else {
+                        warnings.append("未与前一音符相接的连音已使用默认假名。")
+                    }
+                    limited[index].lyric = "ら"
+                }
                 if lane.count > limited.count { warnings.append("「\(source.name)」超过 \(MelodyProject.maxNotesPerTrack) 个音符，后续音符未导入。") }
                 let name = lanes.count == 1 ? source.name : "\(source.name) \(index + 1)"
                 tracks.append(MelodyTrack(name: sanitizedName(name, fallback: "导入音轨"), notes: limited,
@@ -414,7 +423,7 @@ extension ProjectInterchange {
         if let timelineEndTicks {
             furthestStep = max(furthestStep, steps(fromTicks: timelineEndTicks, resolution: resolution))
         }
-        let bars = max(4, Int(ceil(Double(furthestStep) / Double(MelodyProject.stepsPerBar))))
+        let bars = max(1, Int(ceil(Double(furthestStep) / Double(MelodyProject.stepsPerBar))))
         let barCount = min(MelodyProject.maxBars, bars)
         if bars != barCount { warnings.append("超出 \(MelodyProject.maxBars) 小节的内容未导入。") }
         let clippedTracks = tracks.map { track -> MelodyTrack in
@@ -439,7 +448,9 @@ extension ProjectInterchange {
     }
 
     private static func steps(fromTicks ticks: Int, resolution: Int) -> Int {
-        Int((Double(ticks) * Double(MelodyProject.stepsPerBeat) / Double(resolution)).rounded())
+        let maximum = MelodyProject.stepsPerBar * MelodyProject.maxBars + 1
+        let scaled = (Double(ticks) * Double(MelodyProject.stepsPerBeat) / Double(resolution)).rounded()
+        return Int(max(0, min(Double(maximum), scaled)))
     }
 
     private static func ticks(fromStep step: Int) -> Int { step * ticksPerStep }
@@ -449,9 +460,9 @@ extension ProjectInterchange {
     }
 
     private static func lyric(at time: Int, from lyrics: [(time: Int, lyric: String)]) -> String {
-        guard let value = lyrics.last(where: { $0.time <= time })?.lyric else { return "ら" }
+        guard let value = lyrics.last(where: { $0.time == time })?.lyric else { return "ら" }
         let cleaned = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        return cleaned.isEmpty || cleaned == "-" ? "ら" : String(cleaned.prefix(12))
+        return cleaned == "-" ? "ら" : String(cleaned.prefix(12))
     }
 
     private static func unique(_ values: [String]) -> [String] {
@@ -459,8 +470,9 @@ extension ProjectInterchange {
     }
 
     private static func sanitizedName(_ name: String, fallback: String) -> String {
-        let cleaned = name.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: "\n", with: " ")
-        return cleaned.isEmpty ? fallback : String(cleaned.prefix(32))
+        let cleaned = name.components(separatedBy: .controlCharacters).joined(separator: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmed = String(cleaned.prefix(32)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
     }
 
     private static func safeText(_ value: String) -> String {
@@ -497,8 +509,9 @@ extension ProjectInterchange {
     }
 
     private static func boundedInteger(_ value: Double?, minimum: Int = Int.min, maximum: Int = Int.max) -> Int? {
-        guard let value, value.isFinite, value >= Double(minimum), value <= Double(maximum) else { return nil }
-        return Int(value.rounded())
+        guard let value, value.isFinite, let integral = Int(exactly: value.rounded()),
+              (minimum...maximum).contains(integral) else { return nil }
+        return integral
     }
 
     private static func iniBlocks(_ text: String) -> [IniBlock] {

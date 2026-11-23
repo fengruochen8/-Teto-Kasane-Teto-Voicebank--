@@ -102,4 +102,30 @@ final class ProjectInterchangeTests: XCTestCase {
         XCTAssertEqual(result.melody.tracks.count, 1)
         XCTAssertEqual(result.melody.tracks[0].notes.map(\.start), [0, 3_840])
     }
+    func testOneBarRoundTripAndOpenUtauSlur() throws {
+        var slur = MelodyNote(start: 480, length: 480, pitch: 64, lyric: "ら")
+        slur.expression.slur = true
+        let project = MelodyProject(notes: [MelodyNote(start: 0, length: 480, pitch: 60, lyric: "あ"), slur], barCount: 1)
+        for format in ProjectInterchange.allCases {
+            let exported = try format.encode(project, title: "短い旋律", selectedTrackID: nil)
+            let returned = try format.decode(exported).melody
+            XCTAssertEqual(returned.barCount, 1, format.rawValue)
+            XCTAssertEqual(returned.tracks[0].notes.map(\.start), [0, 480])
+            if format == .ustx { XCTAssertTrue(returned.tracks[0].notes[1].expression.slur) }
+        }
+    }
+
+    func testOverflowingUSTTimesGiveAnImportError() {
+        let source = """
+        [#SETTING]
+        Tempo=9.223372036854776e18
+        [#0000]
+        Length=\(Int.max)
+        NoteNum=60
+        Lyric=あ
+        [#TRACKEND]
+        """
+        XCTAssertThrowsError(try ProjectInterchange.ust.decode(Data(source.utf8)))
+    }
+
 }

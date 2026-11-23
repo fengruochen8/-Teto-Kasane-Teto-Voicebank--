@@ -428,9 +428,9 @@ struct StudioView: View {
                 .frame(width: 104)
                 .id(note.id)
                 .disabled(note.expression.slur)
-                Stepper("音高", onIncrement: { move(.pitch, by: 1) }, onDecrement: { move(.pitch, by: -1) })
+                Stepper("音高", onIncrement: { move(\MelodyNote.pitch, by: 1) }, onDecrement: { move(\MelodyNote.pitch, by: -1) })
                     .fixedSize()
-                Stepper("时值", onIncrement: { move(.length, by: snap.rawValue) }, onDecrement: { move(.length, by: -snap.rawValue) })
+                Stepper("时值", onIncrement: { move(\MelodyNote.length, by: snap.rawValue) }, onDecrement: { move(\MelodyNote.length, by: -snap.rawValue) })
                     .fixedSize()
                 Button("调校", systemImage: "waveform.path") {
                     guard let track = model.activeTrack else { return }
