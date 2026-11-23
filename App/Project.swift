@@ -76,20 +76,7 @@ struct MelodyProject: Codable, Equatable, Sendable {
 enum StudioStorage {
     static let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         .appendingPathComponent("MelodySketch", isDirectory: true)
-    private static let projectURL = root.appendingPathComponent("Project.json")
     private static let bankURL = root.appendingPathComponent("ActiveVoicebank.txt")
-
-    static func loadProject() -> MelodyProject {
-        guard let data = try? Data(contentsOf: projectURL),
-              let project = try? JSONDecoder().decode(MelodyProject.self, from: data),
-              project.isValid else { return .example }
-        return project
-    }
-
-    static func save(_ project: MelodyProject) throws {
-        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
-        try JSONEncoder().encode(project).write(to: projectURL, options: .atomic)
-    }
 
     static func bankDirectory(for id: UUID) -> URL {
         root.appendingPathComponent("Voicebanks", isDirectory: true)

@@ -4,7 +4,11 @@ import Foundation
 
 @MainActor
 final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
-    @Published private(set) var project = StudioStorage.loadProject()
+    @Published private(set) var project = MelodyProject()
+    @Published private(set) var currentProject: LocalProject?
+    @Published private(set) var recentProjects: [LocalProject] = []
+    @Published private(set) var isHandlingProjectFile = false
+    @Published private(set) var saveStatus: String?
     @Published private(set) var bank = StudioStorage.loadBank()
     @Published var selectedID: UUID?
     @Published private(set) var entryStep = 0
@@ -23,6 +27,8 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private var songPlayer: AVAudioPlayer?
     private var cache: Data?
     private var lyricEditNote: UUID?
+    private var externalProjectURL: URL?
+    private var didLoadProjectLibrary = false
 
     private struct EditSnapshot {
         let project: MelodyProject
@@ -32,6 +38,8 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     var canUndo: Bool { !undoHistory.isEmpty }
     var canRedo: Bool { !redoHistory.isEmpty }
+    var canSaveToSource: Bool { externalProjectURL != nil }
+    var isBusy: Bool { isHandlingProjectFile || isImporting || isRendering }
 
     var playbackPosition: Double? {
         guard isPlaying, let player = songPlayer, player.duration > 0 else { return nil }
@@ -39,6 +47,124 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     var selected: MelodyNote? { project.notes.first { $0.id == selectedID } }
+
+    func loadProjectLibrary() {
+        guard !didLoadProjectLibrary else { return }
+        didLoadProjectLibrary = true
+        do {
+            try ProjectLibrary.migrateLegacy()
+            recentProjects = try ProjectLibrary.recent()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func createProject(named name: String, melody: MelodyProject = MelodyProject()) {
+        guard !isBusy else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        let document = ProjectDocument(name: trimmed.isEmpty ? "未命名工程" : String(trimmed.prefix(64)), melody: melody)
+        openLocalProject(LocalProject(document: document))
+    }
+
+    func openLocalProject(_ record: LocalProject) {
+        guard !isBusy else { return }
+        do {
+            try installProject(record, url: nil)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func openExternalProject(_ url: URL) async {
+        guard !isBusy else {
+            errorMessage = "请等当前操作完成后，再打开工程。"
+            return
+        }
+        isHandlingProjectFile = true
+        defer { isHandlingProjectFile = false }
+        do {
+            let opened = try await Task.detached(priority: .userInitiated) {
+                try ProjectLibrary.open(url)
+            }.value
+            try installProject(opened, url: url)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func showWelcome() {
+        guard !isBusy else { return }
+        do {
+            if let currentProject { try ProjectLibrary.save(currentProject) }
+            recentProjects = try ProjectLibrary.recent()
+            invalidateAudio()
+            previewPlayer?.stop()
+            currentProject = nil
+            externalProjectURL = nil
+            saveStatus = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func saveToSource() async {
+        guard !isBusy, let currentProject, let url = externalProjectURL else { return }
+        isHandlingProjectFile = true
+        defer { isHandlingProjectFile = false }
+        do {
+            let bookmark = try await Task.detached(priority: .userInitiated) {
+                try ProjectLibrary.write(currentProject.document, to: url)
+                return ProjectLibrary.bookmark(for: url)
+            }.value
+            saveStatus = "已保存到文件"
+            if let bookmark, var record = self.currentProject, record.id == currentProject.id {
+                record.externalBookmark = bookmark
+                self.currentProject = record
+                do {
+                    try ProjectLibrary.save(record)
+                } catch {
+                    errorMessage = "工程文件已保存，更新本机工程信息时出错。\n\(error.localizedDescription)"
+                }
+            }
+        } catch {
+            errorMessage = "无法更新原工程文件。请使用「另存为」保存副本。\n\(error.localizedDescription)"
+        }
+    }
+
+    func recordProjectExport(to url: URL, projectID: UUID) {
+        guard var record = currentProject, record.id == projectID else { return }
+        externalProjectURL = url
+        record.externalBookmark = ProjectLibrary.bookmark(for: url)
+        currentProject = record
+        do {
+            try ProjectLibrary.save(record)
+            saveStatus = "已保存到文件"
+        } catch {
+            errorMessage = "文件已导出，保存本机工程信息时出错。\n\(error.localizedDescription)"
+        }
+    }
+
+    private func installProject(_ record: LocalProject, url: URL?) throws {
+        if let currentProject, currentProject.id != record.id {
+            try ProjectLibrary.save(currentProject)
+        }
+        var next = record
+        next.updatedAt = Date()
+        try ProjectLibrary.save(next)
+
+        invalidateAudio()
+        previewPlayer?.stop()
+        project = next.document.melody
+        selectedID = nil
+        entryStep = 0
+        transportStep = 0
+        undoHistory.removeAll()
+        redoHistory.removeAll()
+        finishLyricEdit()
+        saveStatus = nil
+        externalProjectURL = url ?? next.externalBookmark.flatMap { ProjectLibrary.url(for: $0) }
+        currentProject = next
+    }
 
     var entryLocation: String {
         guard entryStep < MelodyProject.steps else { return "已到曲尾" }
@@ -157,17 +283,22 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     private func apply(_ value: MelodyProject) {
+        guard var active = currentProject else { return }
         project = value
+        active.document.melody = value
+        active.updatedAt = Date()
+        currentProject = active
+        saveStatus = nil
         invalidateAudio()
         do {
-            try StudioStorage.save(value)
+            try ProjectLibrary.save(active)
         } catch {
             errorMessage = "旋律保存失败。\(error.localizedDescription)"
         }
     }
 
     func importZIP(_ url: URL) async {
-        guard !isImporting && !isRendering else { return }
+        guard !isBusy else { return }
         isImporting = true
         defer { isImporting = false }
         do {
@@ -193,7 +324,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     func renderedAudio() async -> Data? {
-        guard !isRendering && !isImporting else { return nil }
+        guard !isBusy, let projectID = currentProject?.id else { return nil }
         if let cache { return cache }
         guard let bank else {
             errorMessage = StudioError.noVoicebank.localizedDescription
@@ -206,7 +337,11 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
             let data = try await Task.detached(priority: .userInitiated) {
                 try MelodyAudio.render(snapshot, bank: bank)
             }.value
-            guard project == snapshot, self.bank?.id == bank.id else { return nil }
+            guard currentProject?.id == projectID else { return nil }
+            guard project == snapshot, self.bank?.id == bank.id else {
+                errorMessage = "合成期间旋律或音源有更新，请重新试听或导出。"
+                return nil
+            }
             cache = data
             return data
         } catch {

@@ -16,6 +16,8 @@
 		B20000000000000000000008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000009 /* Assets.xcassets */; };
 		B20000000000000000000009 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000002 /* ZIPFoundation */; };
 		B20000000000000000000010 /* PianoKeyboard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000012 /* PianoKeyboard.swift */; };
+		B20000000000000000000011 /* ProjectLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* ProjectLibrary.swift */; };
+		B20000000000000000000012 /* ProjectWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* ProjectWorkspace.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -31,6 +33,9 @@
 		A10000000000000000000010 /* TetoMelody.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TetoMelody.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A10000000000000000000011 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
 		A10000000000000000000012 /* PianoKeyboard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PianoKeyboard.swift; sourceTree = "<group>"; };
+		A10000000000000000000013 /* ProjectLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectLibrary.swift; sourceTree = "<group>"; };
+		A10000000000000000000014 /* ProjectWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectWorkspace.swift; sourceTree = "<group>"; };
+		A10000000000000000000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -54,12 +59,15 @@
 				A10000000000000000000001 /* MelodySketchApp.swift */,
 				A10000000000000000000002 /* PianoRoll.swift */,
 				A10000000000000000000012 /* PianoKeyboard.swift */,
+				A10000000000000000000014 /* ProjectWorkspace.swift */,
+				A10000000000000000000013 /* ProjectLibrary.swift */,
 				A10000000000000000000003 /* Project.swift */,
 				A10000000000000000000004 /* Voicebank.swift */,
 				A10000000000000000000005 /* MelodyAudio.swift */,
 				A10000000000000000000006 /* StudioModel.swift */,
 				A10000000000000000000009 /* Assets.xcassets */,
 				A10000000000000000000011 /* App.xcconfig */,
+				A10000000000000000000015 /* Info.plist */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -132,6 +140,8 @@
 				B20000000000000000000001 /* MelodySketchApp.swift in Sources */,
 				B20000000000000000000002 /* PianoRoll.swift in Sources */,
 				B20000000000000000000010 /* PianoKeyboard.swift in Sources */,
+				B20000000000000000000012 /* ProjectWorkspace.swift in Sources */,
+				B20000000000000000000011 /* ProjectLibrary.swift in Sources */,
 				B20000000000000000000003 /* Project.swift in Sources */,
 				B20000000000000000000004 /* Voicebank.swift in Sources */,
 				B20000000000000000000005 /* MelodyAudio.swift in Sources */,

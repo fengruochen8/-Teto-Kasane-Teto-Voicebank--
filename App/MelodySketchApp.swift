@@ -1,43 +1,26 @@
 import SwiftUI
-import UniformTypeIdentifiers
 
 @main
 struct MelodySketchApp: App {
     var body: some Scene {
-        WindowGroup { StudioView() }
-    }
-}
-
-private struct WaveDocument: FileDocument {
-    static let waveType = UTType(filenameExtension: "wav") ?? .audio
-    static var readableContentTypes: [UTType] { [waveType] }
-    var data: Data
-
-    init(data: Data) { self.data = data }
-
-    init(configuration: ReadConfiguration) throws {
-        guard let data = configuration.file.regularFileContents else {
-            throw CocoaError(.fileReadCorruptFile)
-        }
-        self.data = data
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: data)
+        WindowGroup { ProjectWorkspace() }
     }
 }
 
 @MainActor
 struct StudioView: View {
-    @StateObject private var model = StudioModel()
+    @ObservedObject var model: StudioModel
+    let onNew: () -> Void
+    let onOpen: () -> Void
+    let onSave: () -> Void
+    let onSaveAs: () -> Void
+    let onImportVoicebank: () -> Void
+    let onExportWave: () -> Void
     @State private var tool = PianoRollTool.select
     @State private var snap = GridSnap.sixteenth
     @FocusState private var editingLyric: Bool
     @State private var keyboardExpanded = false
     @State private var keyboardMode = PianoKeyboardMode.audition
-    @State private var showImporter = false
-    @State private var showExporter = false
-    @State private var exportDocument: WaveDocument?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -62,30 +45,6 @@ struct StudioView: View {
         .onChange(of: editingLyric) { _, editing in
             if !editing { model.finishLyricEdit() }
         }
-        .fileImporter(isPresented: $showImporter, allowedContentTypes: [.zip]) { result in
-            switch result {
-            case .success(let url):
-                Task { await model.importZIP(url) }
-            case .failure(let error):
-                if (error as NSError).code != CocoaError.Code.userCancelled.rawValue {
-                    model.errorMessage = error.localizedDescription
-                }
-            }
-        }
-        .fileExporter(isPresented: $showExporter, document: exportDocument,
-                      contentType: WaveDocument.waveType, defaultFilename: "旋律草稿") { result in
-            if case .failure(let error) = result {
-                model.errorMessage = error.localizedDescription
-            }
-        }
-        .alert("操作未完成", isPresented: Binding(
-            get: { model.errorMessage != nil },
-            set: { if !$0 { model.errorMessage = nil } }
-        )) {
-            Button("好", role: .cancel) { model.errorMessage = nil }
-        } message: {
-            Text(model.errorMessage ?? "")
-        }
     }
 
     private var header: some View {
@@ -103,9 +62,33 @@ struct StudioView: View {
     }
 
     private var title: some View {
-        Text("旋律草稿")
-            .font(.system(size: 34, weight: .semibold))
-            .accessibilityAddTraits(.isHeader)
+        HStack(spacing: 10) {
+            Button("返回首页", systemImage: "house", action: model.showWelcome)
+                .buttonStyle(.bordered)
+                .labelStyle(.iconOnly)
+                .disabled(model.isBusy)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(model.currentProject?.document.name ?? "旋律草稿")
+                    .font(.system(size: 29, weight: .semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.6)
+                    .accessibilityAddTraits(.isHeader)
+                if let status = model.saveStatus {
+                    Text(status).font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Menu {
+                Button("新建工程", systemImage: "plus", action: onNew)
+                Button("打开工程", systemImage: "folder", action: onOpen)
+                Button("另存为", systemImage: "doc.on.doc", action: onSaveAs)
+            } label: {
+                Label("工程", systemImage: "doc")
+            }
+            .disabled(model.isBusy)
+            Button("保存", systemImage: "square.and.arrow.down", action: onSave)
+                .buttonStyle(.bordered)
+                .disabled(model.isBusy)
+        }
     }
 
     private var voicebankControls: some View {
@@ -118,11 +101,10 @@ struct StudioView: View {
             } else {
                 Link("下载官方音源", destination: URL(string: "https://kasaneteto.jp/utau/")!)
             }
-            Button(model.bank == nil ? "导入音源 ZIP" : "更换音源", systemImage: "tray.and.arrow.down") {
-                showImporter = true
-            }
-            .buttonStyle(.bordered)
-            .disabled(model.isImporting || model.isRendering)
+            Button(model.bank == nil ? "导入音源 ZIP" : "更换音源",
+                   systemImage: "tray.and.arrow.down", action: onImportVoicebank)
+                .buttonStyle(.bordered)
+                .disabled(model.isBusy)
         }
         .font(.subheadline)
     }
@@ -151,22 +133,16 @@ struct StudioView: View {
             .buttonStyle(.borderedProminent)
             .tint(PianoRoll.accent)
             .foregroundStyle(.black)
-            .disabled(model.isImporting || model.isRendering)
+            .disabled(model.isBusy)
 
             Toggle(isOn: $model.loops) {
                 Label("循环", systemImage: "repeat")
             }
             .toggleStyle(.button)
 
-            Button("导出 WAV", systemImage: "square.and.arrow.up") {
-                Task {
-                    guard let wave = await model.renderedAudio() else { return }
-                    exportDocument = WaveDocument(data: wave)
-                    showExporter = true
-                }
-            }
-            .buttonStyle(.bordered)
-            .disabled(model.isRendering || model.isImporting)
+            Button("导出 WAV", systemImage: "square.and.arrow.up", action: onExportWave)
+                .buttonStyle(.bordered)
+                .disabled(model.isBusy)
 
             if model.isRendering { ProgressView("合成中").controlSize(.small) }
         }
