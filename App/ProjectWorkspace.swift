@@ -197,8 +197,8 @@ private struct WelcomeView: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 28) {
-                appTitle
+            VStack(alignment: .leading, spacing: 22) {
+                hero
                 ViewThatFits(in: .horizontal) {
                     HStack(spacing: 14) { newCard; openCard }
                     VStack(spacing: 12) { newCard; openCard }
@@ -206,25 +206,70 @@ private struct WelcomeView: View {
                 recent
             }
             .padding(.horizontal, 28)
-            .padding(.vertical, 48)
-            .frame(maxWidth: 820)
+            .padding(.vertical, 34)
+            .frame(maxWidth: 1_040)
             .frame(maxWidth: .infinity)
         }
-        .background(Color(red: 0.07, green: 0.11, blue: 0.15).ignoresSafeArea())
+        .background(StudioTheme.backdrop.ignoresSafeArea())
     }
 
-    private var appTitle: some View {
-        HStack(spacing: 16) {
-            Image(systemName: "pianokeys")
-                .font(.system(size: 27, weight: .semibold))
-                .foregroundStyle(.black)
-                .frame(width: 56, height: 56)
-                .background(PianoRoll.accent, in: RoundedRectangle(cornerRadius: 15))
-                .accessibilityHidden(true)
-            Text("旋律草稿")
-                .font(.system(size: 38, weight: .semibold))
-                .accessibilityAddTraits(.isHeader)
+    private var hero: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 0) {
+                heroCopy
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(32)
+                heroIllustration
+                    .frame(minWidth: 330, maxWidth: .infinity)
+                    .frame(height: 288)
+                    .clipped()
+            }
+            .frame(minHeight: 288)
+
+            VStack(alignment: .leading, spacing: 0) {
+                heroCopy
+                    .padding(26)
+                heroIllustration
+                    .frame(height: 188)
+                    .clipped()
+            }
         }
+        .background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 26, style: .continuous)
+                .stroke(StudioTheme.border.opacity(0.78), lineWidth: 1)
+                .allowsHitTesting(false)
+        }
+        .shadow(color: StudioTheme.backgroundTop.opacity(0.38), radius: 24, y: 12)
+    }
+
+    private var heroCopy: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            Text("旋律草稿")
+                .font(.system(size: 42, weight: .bold, design: .rounded))
+                .foregroundStyle(StudioTheme.ink)
+                .accessibilityAddTraits(.isHeader)
+            Text("为重音Teto编写旋律")
+                .font(.system(size: 16, weight: .medium))
+                .foregroundStyle(StudioTheme.muted)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var heroIllustration: some View {
+        Image("WelcomeIllustration")
+            .resizable()
+            .scaledToFill()
+            .overlay(alignment: .leading) {
+                LinearGradient(
+                    colors: [StudioTheme.surface.opacity(0.85), .clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                .allowsHitTesting(false)
+            }
+            .accessibilityHidden(true)
     }
 
     private var newCard: some View {
@@ -237,22 +282,34 @@ private struct WelcomeView: View {
 
     private func actionCard(_ title: String, detail: String, icon: String, highlighted: Bool, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 15) {
                 Image(systemName: icon)
-                    .font(.system(size: 22, weight: .semibold))
-                    .foregroundStyle(PianoRoll.accent)
-                Text(title).font(.title3.weight(.semibold))
-                Text(detail).font(.subheadline).foregroundStyle(.secondary)
+                    .font(.system(size: 20, weight: .bold))
+                    .foregroundStyle(highlighted ? StudioTheme.background : StudioTheme.secondary)
+                    .frame(width: 44, height: 44)
+                    .background(highlighted ? StudioTheme.accent : StudioTheme.raised, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                VStack(alignment: .leading, spacing: 5) {
+                    Text(title)
+                        .font(.system(size: 19, weight: .bold, design: .rounded))
+                        .foregroundStyle(StudioTheme.ink)
+                    Text(detail)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(StudioTheme.muted)
+                }
+                Spacer(minLength: 4)
+                Image(systemName: "arrow.up.right")
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(highlighted ? StudioTheme.accent : StudioTheme.muted)
             }
             .frame(minWidth: 214, maxWidth: .infinity, alignment: .leading)
-            .padding(18)
+            .padding(20)
             .background(
-                highlighted ? PianoRoll.accent.opacity(0.11) : Color.white.opacity(0.055),
-                in: RoundedRectangle(cornerRadius: 16)
+                highlighted ? StudioTheme.raised : StudioTheme.surface,
+                in: RoundedRectangle(cornerRadius: 18, style: .continuous)
             )
             .overlay {
-                RoundedRectangle(cornerRadius: 16)
-                    .strokeBorder(highlighted ? PianoRoll.accent.opacity(0.50) : Color.white.opacity(0.10))
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .strokeBorder(highlighted ? StudioTheme.accent.opacity(0.72) : StudioTheme.border.opacity(0.84))
                     .allowsHitTesting(false)
             }
             .contentShape(Rectangle())
@@ -264,36 +321,44 @@ private struct WelcomeView: View {
     private var recent: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Text("最近工程").font(.title3.weight(.semibold)).accessibilityAddTraits(.isHeader)
+                Text("最近工程")
+                    .font(.system(size: 21, weight: .bold, design: .rounded))
+                    .foregroundStyle(StudioTheme.ink)
+                    .accessibilityAddTraits(.isHeader)
                 Spacer()
                 Button("打开示例", systemImage: "music.note", action: onExample)
-                    .buttonStyle(.bordered)
+                    .buttonStyle(StudioButtonStyle())
             }
             if projects.isEmpty {
                 Text("新建或打开的工程会显示在这里。")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(StudioTheme.muted)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(18)
-                    .background(Color.white.opacity(0.045), in: RoundedRectangle(cornerRadius: 12))
+                    .padding(20)
+                    .background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                    .overlay { RoundedRectangle(cornerRadius: 16, style: .continuous).stroke(StudioTheme.border, lineWidth: 1).allowsHitTesting(false) }
             } else {
                 LazyVStack(spacing: 8) {
                     ForEach(projects) { record in
                         Button { onRecent(record) } label: {
                             HStack(spacing: 12) {
-                                Image(systemName: "music.note.list").foregroundStyle(PianoRoll.accent)
+                                Image(systemName: "music.note.list")
+                                    .foregroundStyle(StudioTheme.accent)
+                                    .frame(width: 34, height: 34)
+                                    .background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 VStack(alignment: .leading, spacing: 4) {
-                                    Text(record.document.name).font(.headline).lineLimit(1)
+                                    Text(record.document.name).font(.headline).foregroundStyle(StudioTheme.ink).lineLimit(1)
                                     Text("\(record.document.melody.notes.count)个音符 · \(record.document.melody.tempo) BPM")
-                                        .font(.subheadline).foregroundStyle(.secondary)
+                                        .font(.subheadline).foregroundStyle(StudioTheme.muted)
                                 }
                                 Spacer(minLength: 4)
                                 Text(record.updatedAt, format: .dateTime.month().day())
-                                    .font(.subheadline).foregroundStyle(.secondary)
+                                    .font(.subheadline).foregroundStyle(StudioTheme.muted)
                                 Image(systemName: "chevron.right")
-                                    .font(.footnote.weight(.semibold)).foregroundStyle(.secondary)
+                                    .font(.footnote.weight(.semibold)).foregroundStyle(StudioTheme.muted)
                             }
                             .padding(14)
-                            .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 11))
+                            .background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(StudioTheme.border.opacity(0.82), lineWidth: 1).allowsHitTesting(false) }
                             .contentShape(Rectangle())
                         }
                         .buttonStyle(.plain)
@@ -314,11 +379,30 @@ private struct NewProjectSheet: View {
 
     var body: some View {
         NavigationStack {
-            Form {
-                TextField("工程名称", text: $name)
-                    .focused($titleFocused)
-                    .submitLabel(.done)
-                    .onSubmit(create)
+            ZStack {
+                StudioTheme.backdrop.ignoresSafeArea()
+                VStack(alignment: .leading, spacing: 18) {
+                    Label("工程名称", systemImage: "music.note.list")
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(StudioTheme.secondary)
+                    TextField("未命名工程", text: $name)
+                        .focused($titleFocused)
+                        .submitLabel(.done)
+                        .onSubmit(create)
+                        .font(.system(size: 18, weight: .semibold))
+                        .foregroundStyle(StudioTheme.ink)
+                        .padding(.horizontal, 14)
+                        .frame(height: 50)
+                        .background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+                        .overlay { RoundedRectangle(cornerRadius: 14, style: .continuous).stroke(StudioTheme.border, lineWidth: 1).allowsHitTesting(false) }
+                    Text("工程会保存在本机，可随时导出为.tetomelody文件。")
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundStyle(StudioTheme.muted)
+                }
+                .padding(22)
+                .background(StudioTheme.surface, in: RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay { RoundedRectangle(cornerRadius: 22, style: .continuous).stroke(StudioTheme.border, lineWidth: 1).allowsHitTesting(false) }
+                .padding(20)
             }
             .navigationTitle("新建工程")
             .navigationBarTitleDisplayMode(.inline)
@@ -331,6 +415,7 @@ private struct NewProjectSheet: View {
                 }
             }
         }
+        .tint(StudioTheme.accent)
         .onAppear { titleFocused = true }
     }
 

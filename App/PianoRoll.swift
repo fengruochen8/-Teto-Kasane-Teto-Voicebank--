@@ -28,7 +28,7 @@ struct PianoRoll: View {
     @State private var drag: NoteDrag?
     @State private var drawing: MelodyNote?
 
-    static let accent = Color(red: 0.98, green: 0.68, blue: 0.42)
+    static let accent = StudioTheme.accent
     private let naturalKeys: Set<Int> = [0, 2, 4, 5, 7, 9, 11]
 
     var body: some View {
@@ -41,19 +41,24 @@ struct PianoRoll: View {
                     drawNotes(context, layout: layout)
                     let transport = Double(model.transportStep)
                     if let playback {
-                        drawCursor(context, layout: layout, step: playback, color: Self.accent, width: 2)
+                        drawCursor(context, layout: layout, step: playback, color: StudioTheme.playhead, width: 2)
                     } else if showsEntryCursor {
                         if model.entryStep != model.transportStep {
                             drawCursor(context, layout: layout, step: transport, color: .white.opacity(0.48), width: 1)
                         }
                         drawCursor(context, layout: layout, step: Double(model.entryStep), color: Self.accent, width: 1.5)
                     } else {
-                        drawCursor(context, layout: layout, step: transport, color: Self.accent.opacity(0.72), width: 1.5)
+                        drawCursor(context, layout: layout, step: transport, color: StudioTheme.playhead.opacity(0.72), width: 1.5)
                     }
                 }
             }
-            .background(Color(red: 0.09, green: 0.14, blue: 0.19))
+            .background(StudioTheme.roll)
             .clipShape(RoundedRectangle(cornerRadius: 14))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14)
+                    .strokeBorder(StudioTheme.border, lineWidth: 1)
+                    .allowsHitTesting(false)
+            }
             .contentShape(Rectangle())
             .gesture(
                 DragGesture(minimumDistance: 5)
@@ -67,6 +72,8 @@ struct PianoRoll: View {
     }
 
     private func drawGrid(_ context: GraphicsContext, layout: RollLayout) {
+        let ruler = CGRect(x: 0, y: 0, width: layout.size.width, height: layout.header)
+        context.fill(Path(ruler), with: .color(StudioTheme.raised))
         let activePitch = drag?.candidate.pitch ?? drawing?.pitch ?? model.selected?.pitch
         for pitch in MelodyProject.pitches {
             let y = layout.rowTop(pitch)
@@ -74,13 +81,13 @@ struct PianoRoll: View {
             let pitchSelected = pitch == activePitch
             let key = CGRect(x: 0, y: y, width: layout.keys, height: layout.row)
             let row = CGRect(x: layout.keys, y: y, width: layout.size.width - layout.keys, height: layout.row)
-            let keyColor: Color = pitchSelected ? Self.accent : isNatural ? .white.opacity(0.88) : .black.opacity(0.54)
+            let keyColor = pitchSelected ? Self.accent : isNatural ? StudioTheme.keyWhite : StudioTheme.keyBlack
             context.fill(Path(key), with: .color(keyColor))
             if !isNatural { context.fill(Path(row), with: .color(.black.opacity(0.19))) }
             context.stroke(Path { line in
                 line.move(to: CGPoint(x: 0, y: y))
                 line.addLine(to: CGPoint(x: layout.size.width, y: y))
-            }, with: .color(.white.opacity(pitch % 12 == 0 ? 0.29 : 0.08)), lineWidth: 0.7)
+            }, with: .color(StudioTheme.secondary.opacity(pitch % 12 == 0 ? 0.33 : 0.10)), lineWidth: 0.7)
             if (isNatural || pitchSelected), layout.row >= 11 {
                 context.draw(
                     Text(MelodyProject.noteName(pitch))
@@ -100,13 +107,13 @@ struct PianoRoll: View {
             context.stroke(Path { line in
                 line.move(to: CGPoint(x: x, y: layout.header))
                 line.addLine(to: CGPoint(x: x, y: layout.size.height))
-            }, with: .color(.white.opacity(opacity)), lineWidth: isBar ? 1 : 0.6)
+            }, with: .color(StudioTheme.secondary.opacity(opacity)), lineWidth: isBar ? 1 : 0.6)
 
             if isBar, step < MelodyProject.steps {
                 context.draw(
                     Text("\(step / MelodyProject.stepsPerBar + 1)")
                         .font(.system(size: 12, weight: .medium, design: .monospaced))
-                        .foregroundColor(.white.opacity(0.66)),
+                        .foregroundColor(StudioTheme.ink.opacity(0.84)),
                     at: CGPoint(x: x + 8, y: layout.header / 2), anchor: .leading
                 )
             }
@@ -124,7 +131,8 @@ struct PianoRoll: View {
     private func drawNote(_ note: MelodyNote, context: GraphicsContext, layout: RollLayout, selected: Bool, ghost: Bool = false) {
         let rect = layout.rect(note)
         let outline = Path(roundedRect: rect, cornerRadius: 3)
-        context.fill(outline, with: .color(Self.accent.opacity(ghost ? 0.45 : selected ? 1 : 0.73)))
+        let color = selected ? Self.accent : StudioTheme.secondary
+        context.fill(outline, with: .color(color.opacity(ghost ? 0.45 : selected ? 1 : 0.78)))
         if selected { context.stroke(outline, with: .color(.white.opacity(0.85)), lineWidth: 1.3) }
         if rect.width > 22, rect.height >= 10 {
             let fontSize = min(12, rect.height - 2)

@@ -23,8 +23,13 @@ struct PianoKeyboard: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        .background(Color(red: 0.10, green: 0.15, blue: 0.20))
+        .background(StudioTheme.surface)
         .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .strokeBorder(StudioTheme.border, lineWidth: 1)
+                .allowsHitTesting(false)
+        }
         .animation(.snappy(duration: 0.22), value: isExpanded)
     }
 
@@ -33,17 +38,16 @@ struct PianoKeyboard: View {
             if isExpanded {
                 HStack(spacing: 10) {
                     title
-                    Picker("键盘操作", selection: $mode) {
-                        Text("试听").tag(PianoKeyboardMode.audition)
-                        Text("录入").tag(PianoKeyboardMode.entry)
-                    }
-                    .pickerStyle(.segmented)
+                    StudioSegments(
+                        selection: $mode, label: "键盘操作",
+                        options: [(PianoKeyboardMode.audition, "试听"), (PianoKeyboardMode.entry, "录入")]
+                    )
                     .frame(width: 126)
 
                     if mode == .entry {
                         Text(location)
                             .font(.system(size: 12, weight: .medium, design: .rounded))
-                            .foregroundStyle(.white.opacity(0.67))
+                            .foregroundStyle(StudioTheme.muted)
                             .lineLimit(1)
                             .minimumScaleFactor(0.8)
                             .accessibilityHint("点时间尺移动录入光标")
@@ -75,19 +79,19 @@ struct PianoKeyboard: View {
         }
         .padding(.horizontal, 12)
         .frame(height: isExpanded ? 40 : 36)
-        .background(Color.white.opacity(0.055))
+        .background(StudioTheme.raised)
     }
 
     private var title: some View {
         Label("钢琴键盘", systemImage: "pianokeys")
             .font(.system(size: 14, weight: .semibold))
-            .foregroundStyle(.white)
+            .foregroundStyle(StudioTheme.ink)
     }
 
     private func chevron(_ name: String) -> some View {
         Image(systemName: name)
             .font(.system(size: 13, weight: .bold))
-            .foregroundStyle(.white.opacity(0.84))
+            .foregroundStyle(StudioTheme.secondary)
             .frame(width: 36, height: 36)
             .contentShape(Rectangle())
     }
@@ -160,7 +164,7 @@ private struct PianoKeyStyle: ButtonStyle {
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
-            .background(isBlack ? Color(red: 0.07, green: 0.09, blue: 0.12) : Color.white)
+            .background(isBlack ? StudioTheme.keyBlack : StudioTheme.keyWhite)
             .overlay {
                 Rectangle()
                     .stroke(isBlack ? Color.white.opacity(0.16) : Color.black.opacity(0.16), lineWidth: 0.7)

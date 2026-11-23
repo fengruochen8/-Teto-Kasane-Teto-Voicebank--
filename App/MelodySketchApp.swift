@@ -23,7 +23,7 @@ struct StudioView: View {
     @State private var keyboardMode = PianoKeyboardMode.audition
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             header
             controls
             editorTools
@@ -38,10 +38,10 @@ struct StudioView: View {
             }
         }
         .padding(18)
-        .foregroundStyle(Color.white)
-        .background(Color(red: 0.07, green: 0.11, blue: 0.15).ignoresSafeArea())
+        .foregroundStyle(StudioTheme.ink)
+        .background(StudioTheme.backdrop.ignoresSafeArea())
         .preferredColorScheme(.dark)
-        .tint(PianoRoll.accent)
+        .tint(StudioTheme.accent)
         .onChange(of: editingLyric) { _, editing in
             if !editing { model.finishLyricEdit() }
         }
@@ -59,22 +59,25 @@ struct StudioView: View {
                 voicebankControls
             }
         }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .studioPanel(radius: 16)
     }
 
     private var title: some View {
         HStack(spacing: 10) {
             Button("返回首页", systemImage: "house", action: model.showWelcome)
-                .buttonStyle(.bordered)
+                .buttonStyle(StudioButtonStyle())
                 .labelStyle(.iconOnly)
                 .disabled(model.isBusy)
             VStack(alignment: .leading, spacing: 2) {
                 Text(model.currentProject?.document.name ?? "旋律草稿")
-                    .font(.system(size: 29, weight: .semibold))
+                    .font(.system(size: 30, weight: .semibold, design: .rounded))
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                     .accessibilityAddTraits(.isHeader)
                 if let status = model.saveStatus {
-                    Text(status).font(.caption).foregroundStyle(.secondary)
+                    Text(status).font(.caption).foregroundStyle(StudioTheme.muted)
                 }
             }
             Menu {
@@ -83,10 +86,14 @@ struct StudioView: View {
                 Button("另存为", systemImage: "doc.on.doc", action: onSaveAs)
             } label: {
                 Label("工程", systemImage: "doc")
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 10)
+                    .frame(minHeight: 40)
+                    .studioPanel(radius: 10)
             }
             .disabled(model.isBusy)
             Button("保存", systemImage: "square.and.arrow.down", action: onSave)
-                .buttonStyle(.bordered)
+                .buttonStyle(StudioButtonStyle())
                 .disabled(model.isBusy)
         }
     }
@@ -97,13 +104,13 @@ struct StudioView: View {
                 ProgressView("正在导入音源").controlSize(.small)
             } else if let bank = model.bank {
                 Label("\(bank.samples.count)个日语音节", systemImage: "checkmark.circle")
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(StudioTheme.muted)
             } else {
                 Link("下载官方音源", destination: URL(string: "https://kasaneteto.jp/utau/")!)
             }
             Button(model.bank == nil ? "导入音源 ZIP" : "更换音源",
                    systemImage: "tray.and.arrow.down", action: onImportVoicebank)
-                .buttonStyle(.bordered)
+                .buttonStyle(StudioButtonStyle())
                 .disabled(model.isBusy)
         }
         .font(.subheadline)
@@ -114,8 +121,8 @@ struct StudioView: View {
             HStack(spacing: 16) { transport; Spacer(minLength: 8); tempo }
             VStack(alignment: .leading, spacing: 8) { transport; tempo }
         }
-        .padding(12)
-        .background(Color.white.opacity(0.055), in: RoundedRectangle(cornerRadius: 14))
+        .padding(10)
+        .studioPanel(radius: 14)
     }
 
     private var transport: some View {
@@ -124,15 +131,13 @@ struct StudioView: View {
                 model.seek(to: 0)
                 if keyboardExpanded && keyboardMode == .entry { model.moveEntryCursor(to: 0) }
             }
-            .buttonStyle(.bordered)
+            .buttonStyle(StudioButtonStyle())
             .labelStyle(.iconOnly)
 
             Button(model.isPlaying ? "停止" : "Teto唱一遍", systemImage: model.isPlaying ? "stop.fill" : "play.fill") {
                 Task { await model.sing() }
             }
-            .buttonStyle(.borderedProminent)
-            .tint(PianoRoll.accent)
-            .foregroundStyle(.black)
+            .buttonStyle(StudioButtonStyle(prominent: true))
             .disabled(model.isBusy)
 
             Toggle(isOn: $model.loops) {
@@ -141,7 +146,7 @@ struct StudioView: View {
             .toggleStyle(.button)
 
             Button("导出 WAV", systemImage: "square.and.arrow.up", action: onExportWave)
-                .buttonStyle(.bordered)
+                .buttonStyle(StudioButtonStyle())
                 .disabled(model.isBusy)
 
             if model.isRendering { ProgressView("合成中").controlSize(.small) }
@@ -175,15 +180,14 @@ struct StudioView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 6)
-        .background(Color.white.opacity(0.04), in: RoundedRectangle(cornerRadius: 11))
+        .studioPanel(radius: 12)
     }
 
     private var toolPicker: some View {
-        Picker("编辑工具", selection: $tool) {
-            Text("选择").tag(PianoRollTool.select)
-            Text("画笔").tag(PianoRollTool.draw)
-        }
-        .pickerStyle(.segmented)
+        StudioSegments(
+            selection: $tool, label: "编辑工具",
+            options: [(PianoRollTool.select, "选择"), (PianoRollTool.draw, "画笔")]
+        )
         .frame(width: 144)
     }
 
@@ -196,7 +200,7 @@ struct StudioView: View {
                 .keyboardShortcut("z", modifiers: [.command, .shift])
                 .disabled(!model.canRedo)
         }
-        .buttonStyle(.bordered)
+        .buttonStyle(StudioButtonStyle())
         .labelStyle(.iconOnly)
     }
 
@@ -204,14 +208,12 @@ struct StudioView: View {
         HStack(spacing: 8) {
             Text("网格吸附")
                 .font(.subheadline)
-                .foregroundStyle(.secondary)
-            Picker("网格吸附", selection: $snap) {
-                ForEach(GridSnap.allCases, id: \.self) { resolution in
-                    Text("1/\(16 / resolution.rawValue)").tag(resolution)
-                }
-            }
-            .pickerStyle(.segmented)
-            .frame(width: 150)
+                .foregroundStyle(StudioTheme.muted)
+            StudioSegments(
+                selection: $snap, label: "网格吸附",
+                options: GridSnap.allCases.map { ($0, "1/\(16 / $0.rawValue)") }
+            )
+            .frame(width: 156)
         }
         .fixedSize()
     }
@@ -226,7 +228,11 @@ struct StudioView: View {
                     get: { model.selected?.lyric ?? "" },
                     set: { model.setLyric($0) }
                 ))
-                .textFieldStyle(.roundedBorder)
+                .textFieldStyle(.plain)
+                .foregroundStyle(StudioTheme.ink)
+                .padding(.horizontal, 10)
+                .frame(height: 34)
+                .background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 8))
                 .focused($editingLyric)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
@@ -245,11 +251,12 @@ struct StudioView: View {
             } else {
                 Text(tool == .select ? "点选音符编辑。点上方时间尺定位播放。" : "点空白网格添加音符，拖动可设置时值。")
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(StudioTheme.muted)
                 Spacer()
             }
         }
         .frame(minHeight: 36)
+        .padding(.horizontal, 4)
     }
 
     private func move(_ key: WritableKeyPath<MelodyNote, Int>, by offset: Int) {
