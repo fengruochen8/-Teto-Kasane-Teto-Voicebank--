@@ -307,12 +307,12 @@
 		};
 		F60000000000000000000012 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			buildSettings = { BUNDLE_LOADER = "$(TEST_HOST)"; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.fengruochen8.tetomelody.tests; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 2; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TetoMelody.app/TetoMelody"; };
+			buildSettings = { BUNDLE_LOADER = "$(TEST_HOST)"; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.fengruochen8.tetomelody.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 2; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TetoMelody.app/TetoMelody"; };
 			name = Debug;
 		};
 		F60000000000000000000013 /* Release */ = {
 			isa = XCBuildConfiguration;
-			buildSettings = { BUNDLE_LOADER = "$(TEST_HOST)"; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.fengruochen8.tetomelody.tests; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 2; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TetoMelody.app/TetoMelody"; };
+			buildSettings = { BUNDLE_LOADER = "$(TEST_HOST)"; GENERATE_INFOPLIST_FILE = YES; PRODUCT_BUNDLE_IDENTIFIER = com.fengruochen8.tetomelody.tests; PRODUCT_NAME = "$(TARGET_NAME)"; SWIFT_VERSION = 5.0; TARGETED_DEVICE_FAMILY = 2; TEST_HOST = "$(BUILT_PRODUCTS_DIR)/TetoMelody.app/TetoMelody"; };
 			name = Release;
 		};
 /* End XCBuildConfiguration section */

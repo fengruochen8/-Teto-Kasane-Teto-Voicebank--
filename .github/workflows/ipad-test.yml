@@ -23,7 +23,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 25
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Select Xcode and iPad
         run: |
           echo 'DEVELOPER_DIR=/Applications/Xcode_16.4.app/Contents/Developer' >> "$GITHUB_ENV"
@@ -43,7 +43,7 @@ jobs:
           set -o pipefail
           xcodebuild test -project TetoMelody.xcodeproj -scheme TetoMelody \
             -destination "platform=iOS Simulator,id=$IPAD_SIMULATOR_ID" \
-            -parallel-testing-enabled NO CODE_SIGNING_ALLOWED=NO
+            -parallel-testing-enabled NO ONLY_ACTIVE_ARCH=YES CODE_SIGNING_ALLOWED=NO
       - name: Test the standalone DSP
         run: |
           c++ -std=c++17 -O2 -Wall -Wextra -Werror -INative Native/TetoDSP.cpp Tests/TetoDSPTests.cpp -o "$RUNNER_TEMP/teto-dsp-tests"
