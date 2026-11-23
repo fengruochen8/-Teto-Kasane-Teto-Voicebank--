@@ -267,6 +267,23 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         place(note, lyricEdit: note.id)
     }
 
+    func applyBatchLyrics(_ replacements: [UUID: String], to track: MelodyTrack, in projectID: UUID) {
+        guard currentProject?.id == projectID, activeTrack == track,
+              let index = project.tracks.firstIndex(where: { $0.id == track.id }),
+              Set(replacements.keys).isSubset(of: Set(track.notes.map(\.id))) else {
+            errorMessage = "工程或音轨已更新，请重新预览批量歌词。"
+            return
+        }
+
+        var updated = project
+        for noteIndex in track.notes.indices {
+            if let lyric = replacements[track.notes[noteIndex].id] {
+                updated.tracks[index].notes[noteIndex].lyric = lyric
+            }
+        }
+        update(updated)
+    }
+
     func finishLyricEdit() {
         lyricEditNote = nil
     }

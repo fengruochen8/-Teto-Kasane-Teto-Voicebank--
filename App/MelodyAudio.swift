@@ -16,6 +16,8 @@ enum MelodyAudio {
         for note in notes.sorted(by: { $0.start < $1.start }) {
             let inputLyric = Voicebank.kana(note.lyric)
             let lyric = inputLyric.isEmpty ? "ら" : inputLyric
+            // The standalone bank has no sokuon recording. Its note provides the closure time.
+            if lyric == "っ", bank.samples[lyric] == nil { continue }
             guard let sample = bank.samples[lyric] else { throw StudioError.missingLyric(note.lyric) }
 
             let source: [Float]

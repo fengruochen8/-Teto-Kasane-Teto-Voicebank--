@@ -21,6 +21,17 @@ struct StudioView: View {
     @FocusState private var editingLyric: Bool
     @State private var keyboardExpanded = false
     @State private var keyboardMode = PianoKeyboardMode.audition
+    @State private var batchLyricsRequest: BatchLyricsRequest?
+
+    private struct BatchLyricsRequest: Identifiable {
+        let projectID: UUID
+        let track: MelodyTrack
+        let selectedID: UUID?
+        let entryStep: Int
+        let availableSamples: Set<String>?
+
+        var id: UUID { track.id }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -40,6 +51,14 @@ struct StudioView: View {
         .background(StudioTheme.backdrop.ignoresSafeArea())
         .preferredColorScheme(.dark)
         .tint(StudioTheme.accent)
+        .sheet(item: $batchLyricsRequest) { request in
+            BatchLyricsSheet(
+                track: request.track, selectedID: request.selectedID, entryStep: request.entryStep,
+                availableSamples: request.availableSamples
+            ) { replacements in
+                model.applyBatchLyrics(replacements, to: request.track, in: request.projectID)
+            }
+        }
         .onChange(of: editingLyric) { _, editing in
             if !editing { model.finishLyricEdit() }
         }
@@ -191,11 +210,16 @@ struct StudioView: View {
             HStack(spacing: 12) {
                 toolPicker
                 historyButtons
+                batchLyricsButton
                 Spacer(minLength: 10)
                 snapPicker
             }
             VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 12) { toolPicker; historyButtons }
+                HStack(spacing: 12) {
+                    toolPicker
+                    historyButtons
+                    batchLyricsButton.labelStyle(.iconOnly)
+                }
                 snapPicker
             }
         }
@@ -223,6 +247,20 @@ struct StudioView: View {
         }
         .buttonStyle(StudioButtonStyle())
         .labelStyle(.iconOnly)
+    }
+
+    private var batchLyricsButton: some View {
+        Button("批量歌词", systemImage: "text.alignleft") {
+            guard let projectID = model.currentProject?.id, let track = model.activeTrack else { return }
+            editingLyric = false
+            model.finishLyricEdit()
+            batchLyricsRequest = BatchLyricsRequest(
+                projectID: projectID, track: track, selectedID: model.selectedID, entryStep: model.entryStep,
+                availableSamples: model.bank.map { Set($0.samples.keys) }
+            )
+        }
+        .buttonStyle(StudioButtonStyle())
+        .disabled(model.isBusy || model.activeTrack?.notes.isEmpty != false)
     }
 
     private var snapPicker: some View {

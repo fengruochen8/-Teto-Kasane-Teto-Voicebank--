@@ -20,6 +20,11 @@
 		B20000000000000000000012 /* ProjectWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* ProjectWorkspace.swift */; };
 		B20000000000000000000013 /* StudioTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* StudioTheme.swift */; };
 		B20000000000000000000014 /* TrackPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* TrackPanel.swift */; };
+		B20000000000000000000015 /* JapaneseLyrics.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000018 /* JapaneseLyrics.swift */; };
+		B20000000000000000000016 /* BatchLyricsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000019 /* BatchLyricsSheet.swift */; };
+		B20000000000000000000019 /* JapaneseLyricsNotices.txt in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000020 /* JapaneseLyricsNotices.txt */; };
+		B20000000000000000000017 /* Mecab-Swift in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000004 /* Mecab-Swift */; };
+		B20000000000000000000018 /* IPADic in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000005 /* IPADic */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -40,13 +45,20 @@
 		A10000000000000000000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000016 /* StudioTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioTheme.swift; sourceTree = "<group>"; };
 		A10000000000000000000017 /* TrackPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackPanel.swift; sourceTree = "<group>"; };
+		A10000000000000000000018 /* JapaneseLyrics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JapaneseLyrics.swift; sourceTree = "<group>"; };
+		A10000000000000000000019 /* BatchLyricsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BatchLyricsSheet.swift; sourceTree = "<group>"; };
+		A10000000000000000000020 /* JapaneseLyricsNotices.txt */ = {isa = PBXFileReference; lastKnownFileType = text; path = JapaneseLyricsNotices.txt; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		D40000000000000000000001 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
-			files = (B20000000000000000000009 /* ZIPFoundation in Frameworks */,);
+			files = (
+				B20000000000000000000009 /* ZIPFoundation in Frameworks */,
+				B20000000000000000000017 /* Mecab-Swift in Frameworks */,
+				B20000000000000000000018 /* IPADic in Frameworks */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
@@ -66,6 +78,9 @@
 				A10000000000000000000014 /* ProjectWorkspace.swift */,
 				A10000000000000000000016 /* StudioTheme.swift */,
 				A10000000000000000000017 /* TrackPanel.swift */,
+				A10000000000000000000018 /* JapaneseLyrics.swift */,
+				A10000000000000000000019 /* BatchLyricsSheet.swift */,
+				A10000000000000000000020 /* JapaneseLyricsNotices.txt */,
 				A10000000000000000000013 /* ProjectLibrary.swift */,
 				A10000000000000000000003 /* Project.swift */,
 				A10000000000000000000004 /* Voicebank.swift */,
@@ -104,7 +119,11 @@
 			buildRules = ();
 			dependencies = ();
 			name = TetoMelody;
-			packageProductDependencies = (C30000000000000000000002 /* ZIPFoundation */,);
+			packageProductDependencies = (
+				C30000000000000000000002 /* ZIPFoundation */,
+				C30000000000000000000004 /* Mecab-Swift */,
+				C30000000000000000000005 /* IPADic */,
+			);
 			productName = TetoMelody;
 			productReference = A10000000000000000000010 /* TetoMelody.app */;
 			productType = "com.apple.product-type.application";
@@ -121,7 +140,10 @@
 			hasScannedForEncodings = 0;
 			knownRegions = ("zh-Hans", en, Base,);
 			mainGroup = E50000000000000000000001;
-			packageReferences = (C30000000000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,);
+			packageReferences = (
+				C30000000000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,
+				C30000000000000000000003 /* XCRemoteSwiftPackageReference "Mecab-Swift" */,
+			);
 			productRefGroup = E50000000000000000000004 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
@@ -133,7 +155,10 @@
 		D40000000000000000000002 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
-			files = (B20000000000000000000008 /* Assets.xcassets in Resources */,);
+			files = (
+				B20000000000000000000008 /* Assets.xcassets in Resources */,
+				B20000000000000000000019 /* JapaneseLyricsNotices.txt in Resources */,
+			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXResourcesBuildPhase section */
@@ -149,6 +174,8 @@
 				B20000000000000000000012 /* ProjectWorkspace.swift in Sources */,
 				B20000000000000000000013 /* StudioTheme.swift in Sources */,
 				B20000000000000000000014 /* TrackPanel.swift in Sources */,
+				B20000000000000000000015 /* JapaneseLyrics.swift in Sources */,
+				B20000000000000000000016 /* BatchLyricsSheet.swift in Sources */,
 				B20000000000000000000011 /* ProjectLibrary.swift in Sources */,
 				B20000000000000000000003 /* Project.swift in Sources */,
 				B20000000000000000000004 /* Voicebank.swift in Sources */,
@@ -222,6 +249,11 @@
 			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
 			requirement = {kind = exactVersion; version = 0.9.21; };
 		};
+		C30000000000000000000003 /* XCRemoteSwiftPackageReference "Mecab-Swift" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/shinjukunian/Mecab-Swift.git";
+			requirement = {kind = exactVersion; version = 0.8.0; };
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -229,6 +261,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = C30000000000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
 			productName = ZIPFoundation;
+		};
+		C30000000000000000000004 /* Mecab-Swift */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C30000000000000000000003 /* XCRemoteSwiftPackageReference "Mecab-Swift" */;
+			productName = "Mecab-Swift";
+		};
+		C30000000000000000000005 /* IPADic */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C30000000000000000000003 /* XCRemoteSwiftPackageReference "Mecab-Swift" */;
+			productName = "IPADic";
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
