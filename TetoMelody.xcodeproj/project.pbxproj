@@ -1,0 +1,214 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		B20000000000000000000001 /* MelodySketchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000001 /* MelodySketchApp.swift */; };
+		B20000000000000000000002 /* PianoRoll.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000002 /* PianoRoll.swift */; };
+		B20000000000000000000003 /* Project.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000003 /* Project.swift */; };
+		B20000000000000000000004 /* Voicebank.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000004 /* Voicebank.swift */; };
+		B20000000000000000000005 /* MelodyAudio.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000005 /* MelodyAudio.swift */; };
+		B20000000000000000000006 /* StudioModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000006 /* StudioModel.swift */; };
+		B20000000000000000000007 /* TetoDSP.cpp in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000007 /* TetoDSP.cpp */; };
+		B20000000000000000000008 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000009 /* Assets.xcassets */; };
+		B20000000000000000000009 /* ZIPFoundation in Frameworks */ = {isa = PBXBuildFile; productRef = C30000000000000000000002 /* ZIPFoundation */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		A10000000000000000000001 /* MelodySketchApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MelodySketchApp.swift; sourceTree = "<group>"; };
+		A10000000000000000000002 /* PianoRoll.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PianoRoll.swift; sourceTree = "<group>"; };
+		A10000000000000000000003 /* Project.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Project.swift; sourceTree = "<group>"; };
+		A10000000000000000000004 /* Voicebank.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Voicebank.swift; sourceTree = "<group>"; };
+		A10000000000000000000005 /* MelodyAudio.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MelodyAudio.swift; sourceTree = "<group>"; };
+		A10000000000000000000006 /* StudioModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioModel.swift; sourceTree = "<group>"; };
+		A10000000000000000000007 /* TetoDSP.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = TetoDSP.cpp; sourceTree = "<group>"; };
+		A10000000000000000000008 /* TetoDSP.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = TetoDSP.h; sourceTree = "<group>"; };
+		A10000000000000000000009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A10000000000000000000010 /* TetoMelody.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = TetoMelody.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A10000000000000000000011 /* App.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = App.xcconfig; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		D40000000000000000000001 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B20000000000000000000009 /* ZIPFoundation in Frameworks */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		E50000000000000000000001 = {
+			isa = PBXGroup;
+			children = (E50000000000000000000002 /* App */, E50000000000000000000003 /* Native */, E50000000000000000000004 /* Products */,);
+			sourceTree = "<group>";
+		};
+		E50000000000000000000002 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				A10000000000000000000001 /* MelodySketchApp.swift */,
+				A10000000000000000000002 /* PianoRoll.swift */,
+				A10000000000000000000003 /* Project.swift */,
+				A10000000000000000000004 /* Voicebank.swift */,
+				A10000000000000000000005 /* MelodyAudio.swift */,
+				A10000000000000000000006 /* StudioModel.swift */,
+				A10000000000000000000009 /* Assets.xcassets */,
+				A10000000000000000000011 /* App.xcconfig */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		E50000000000000000000003 /* Native */ = {
+			isa = PBXGroup;
+			children = (A10000000000000000000007 /* TetoDSP.cpp */, A10000000000000000000008 /* TetoDSP.h */,);
+			path = Native;
+			sourceTree = "<group>";
+		};
+		E50000000000000000000004 /* Products */ = {
+			isa = PBXGroup;
+			children = (A10000000000000000000010 /* TetoMelody.app */,);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F60000000000000000000001 /* TetoMelody */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F60000000000000000000005 /* Build configuration list for PBXNativeTarget "TetoMelody" */;
+			buildPhases = (
+				D40000000000000000000003 /* Sources */,
+				D40000000000000000000001 /* Frameworks */,
+				D40000000000000000000002 /* Resources */,
+			);
+			buildRules = ();
+			dependencies = ();
+			name = TetoMelody;
+			packageProductDependencies = (C30000000000000000000002 /* ZIPFoundation */,);
+			productName = TetoMelody;
+			productReference = A10000000000000000000010 /* TetoMelody.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F60000000000000000000002 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {LastSwiftUpdateCheck = 1600; LastUpgradeCheck = 1600; };
+			buildConfigurationList = F60000000000000000000006 /* Build configuration list for PBXProject "TetoMelody" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = "zh-Hans";
+			hasScannedForEncodings = 0;
+			knownRegions = ("zh-Hans", en, Base,);
+			mainGroup = E50000000000000000000001;
+			packageReferences = (C30000000000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */,);
+			productRefGroup = E50000000000000000000004 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (F60000000000000000000001 /* TetoMelody */,);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		D40000000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (B20000000000000000000008 /* Assets.xcassets in Resources */,);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		D40000000000000000000003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				B20000000000000000000001 /* MelodySketchApp.swift in Sources */,
+				B20000000000000000000002 /* PianoRoll.swift in Sources */,
+				B20000000000000000000003 /* Project.swift in Sources */,
+				B20000000000000000000004 /* Voicebank.swift in Sources */,
+				B20000000000000000000005 /* MelodyAudio.swift in Sources */,
+				B20000000000000000000006 /* StudioModel.swift in Sources */,
+				B20000000000000000000007 /* TetoDSP.cpp in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		F60000000000000000000007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_ENABLE_MODULES = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_TESTABILITY = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		F60000000000000000000008 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CLANG_CXX_LANGUAGE_STANDARD = "c++17";
+				CLANG_ENABLE_MODULES = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		F60000000000000000000009 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000011 /* App.xcconfig */;
+			buildSettings = {};
+			name = Debug;
+		};
+		F60000000000000000000010 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = A10000000000000000000011 /* App.xcconfig */;
+			buildSettings = {};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F60000000000000000000005 /* Build configuration list for PBXNativeTarget "TetoMelody" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (F60000000000000000000009 /* Debug */, F60000000000000000000010 /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F60000000000000000000006 /* Build configuration list for PBXProject "TetoMelody" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (F60000000000000000000007 /* Debug */, F60000000000000000000008 /* Release */,);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		C30000000000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/weichsel/ZIPFoundation.git";
+			requirement = {kind = exactVersion; version = 0.9.21; };
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		C30000000000000000000002 /* ZIPFoundation */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = C30000000000000000000001 /* XCRemoteSwiftPackageReference "ZIPFoundation" */;
+			productName = ZIPFoundation;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = F60000000000000000000002 /* Project object */;
+}
