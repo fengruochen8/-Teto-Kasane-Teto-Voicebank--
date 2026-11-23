@@ -22,6 +22,7 @@ enum GridSnap: Int, Hashable, CaseIterable {
 @MainActor
 struct PianoRoll: View {
     @ObservedObject var model: StudioModel
+    let trackID: UUID
     let showsEntryCursor: Bool
     let tool: PianoRollTool
     let snap: GridSnap
@@ -121,7 +122,7 @@ struct PianoRoll: View {
     }
 
     private func drawNotes(_ context: GraphicsContext, layout: RollLayout) {
-        for note in model.project.notes {
+        for note in model.activeTrack?.notes ?? [] {
             let visible = drag?.original.id == note.id ? (drag?.candidate ?? note) : note
             drawNote(visible, context: context, layout: layout, selected: note.id == model.selectedID)
         }
@@ -169,7 +170,7 @@ struct PianoRoll: View {
     }
 
     private func hit(_ point: CGPoint, layout: RollLayout) -> MelodyNote? {
-        model.project.notes.first { layout.rect($0).insetBy(dx: -1, dy: -1).contains(point) }
+        model.activeTrack?.notes.first { layout.rect($0).insetBy(dx: -1, dy: -1).contains(point) }
     }
 
     private func gridStep(_ x: CGFloat, layout: RollLayout) -> Int {
@@ -188,7 +189,8 @@ struct PianoRoll: View {
     }
 
     private func tap(_ point: CGPoint, layout: RollLayout) {
-        guard drag == nil, drawing == nil, point.x >= 0, point.x < layout.size.width else { return }
+        guard model.activeTrack?.id == trackID, drag == nil, drawing == nil,
+              point.x >= 0, point.x < layout.size.width else { return }
         if point.y >= 0, point.y < layout.header, point.x >= layout.keys {
             positionCursor(gridStep(point.x, layout: layout))
             return
@@ -206,6 +208,7 @@ struct PianoRoll: View {
     }
 
     private func dragChanged(_ value: DragGesture.Value, layout: RollLayout) {
+        guard model.activeTrack?.id == trackID else { return }
         let origin = value.startLocation
         if origin.y < layout.header, origin.x >= layout.keys {
             let step = gridStep(value.location.x, layout: layout)
@@ -239,14 +242,14 @@ struct PianoRoll: View {
                 let vertical = Int((value.translation.height / layout.row).rounded())
                 candidate.pitch = max(MelodyProject.pitches.lowerBound, min(MelodyProject.pitches.upperBound, candidate.pitch - vertical))
             }
-            if model.project.canPlace(candidate) {
+            if model.activeTrack?.canPlace(candidate) == true {
                 current.candidate = candidate
                 drag = current
             }
         } else if tool == .draw {
             let from = gridStep(origin.x, layout: layout)
             let to = gridStep(value.location.x, layout: layout)
-            drawing = model.project.newNote(at: min(from, to), pitch: pitch, length: abs(from - to) + snap.rawValue)
+            drawing = model.activeTrack?.newNote(at: min(from, to), pitch: pitch, length: abs(from - to) + snap.rawValue)
         }
     }
 
@@ -255,6 +258,7 @@ struct PianoRoll: View {
             drag = nil
             drawing = nil
         }
+        guard model.activeTrack?.id == trackID else { return }
         if let drag, drag.candidate != drag.original, model.place(drag.candidate) {
             if drag.candidate.pitch != drag.original.pitch { model.audition(pitch: drag.candidate.pitch) }
         } else if let drawing, model.place(drawing) {

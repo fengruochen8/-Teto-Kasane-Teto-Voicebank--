@@ -376,7 +376,7 @@ private struct WelcomeView: View {
                                     .background(StudioTheme.raised, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
                                 VStack(alignment: .leading, spacing: 4) {
                                     Text(record.document.name).font(.headline).foregroundStyle(StudioTheme.ink).lineLimit(1)
-                                    Text("\(record.document.melody.notes.count)个音符 · \(record.document.melody.tempo) BPM")
+                                    Text("\(record.document.melody.tracks.count)条音轨 · \(record.document.melody.noteCount)个音符 · \(record.document.melody.tempo) BPM")
                                         .font(.subheadline).foregroundStyle(StudioTheme.muted)
                                 }
                                 Spacer(minLength: 4)

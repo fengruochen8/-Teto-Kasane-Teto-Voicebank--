@@ -6,7 +6,7 @@ struct ProjectDocument: Codable, Sendable {
     var melody: MelodyProject
 
     init(name: String, melody: MelodyProject) {
-        self.version = 1
+        self.version = 2
         self.name = name.trimmingCharacters(in: .whitespacesAndNewlines)
         self.melody = melody
     }
@@ -15,13 +15,12 @@ struct ProjectDocument: Codable, Sendable {
         guard !data.isEmpty, data.count <= ProjectLibrary.maximumFileSize else {
             throw ProjectLibraryError.fileTooLarge
         }
-        var document: ProjectDocument
+        let document: ProjectDocument
         do {
             document = try JSONDecoder().decode(ProjectDocument.self, from: data)
         } catch {
             throw ProjectLibraryError.invalidDocument
         }
-        document.name = document.name.trimmingCharacters(in: .whitespacesAndNewlines)
         try document.validate()
         return document
     }
@@ -38,7 +37,7 @@ struct ProjectDocument: Codable, Sendable {
     }
 
     func validate() throws {
-        guard version == 1, Self.validName(name), melody.isValid else {
+        guard version == 2, Self.validName(name), melody.isValid else {
             throw ProjectLibraryError.invalidDocument
         }
     }
@@ -47,6 +46,19 @@ struct ProjectDocument: Codable, Sendable {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         return name == trimmed && !name.isEmpty && name.count <= 64 &&
             !trimmed.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) })
+    }
+
+    private enum CodingKeys: String, CodingKey { case version, name, melody }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let sourceVersion = try container.decode(Int.self, forKey: .version)
+        guard sourceVersion == 1 || sourceVersion == 2 else {
+            throw DecodingError.dataCorruptedError(forKey: .version, in: container, debugDescription: "Unsupported project version")
+        }
+        self.version = 2
+        self.name = try container.decode(String.self, forKey: .name).trimmingCharacters(in: .whitespacesAndNewlines)
+        self.melody = try container.decode(MelodyProject.self, forKey: .melody)
     }
 }
 

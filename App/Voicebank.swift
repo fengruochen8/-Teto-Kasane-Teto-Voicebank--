@@ -144,6 +144,7 @@ enum StudioError: LocalizedError {
     case invalidSample(String)
     case noVoicebank
     case emptyMelody
+    case silencedMelody
     case playback
 
     var errorDescription: String? {
@@ -154,6 +155,7 @@ enum StudioError: LocalizedError {
         case .invalidSample(let lyric): return "无法合成「\(lyric)」的录音，请重新导入官方音源。"
         case .noVoicebank: return "请先从「文件」导入重音Teto音源。"
         case .emptyMelody: return "先在网格中加入一个音符。"
+        case .silencedMelody: return "当前可听音轨没有音符，请检查静音和独奏设置。"
         case .playback: return "无法播放音频。请检查当前的音频输出后重试。"
         }
     }

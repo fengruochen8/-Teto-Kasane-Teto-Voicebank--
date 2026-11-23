@@ -19,6 +19,7 @@
 		B20000000000000000000011 /* ProjectLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000013 /* ProjectLibrary.swift */; };
 		B20000000000000000000012 /* ProjectWorkspace.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000014 /* ProjectWorkspace.swift */; };
 		B20000000000000000000013 /* StudioTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000016 /* StudioTheme.swift */; };
+		B20000000000000000000014 /* TrackPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = A10000000000000000000017 /* TrackPanel.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -38,6 +39,7 @@
 		A10000000000000000000014 /* ProjectWorkspace.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectWorkspace.swift; sourceTree = "<group>"; };
 		A10000000000000000000015 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		A10000000000000000000016 /* StudioTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioTheme.swift; sourceTree = "<group>"; };
+		A10000000000000000000017 /* TrackPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrackPanel.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -63,6 +65,7 @@
 				A10000000000000000000012 /* PianoKeyboard.swift */,
 				A10000000000000000000014 /* ProjectWorkspace.swift */,
 				A10000000000000000000016 /* StudioTheme.swift */,
+				A10000000000000000000017 /* TrackPanel.swift */,
 				A10000000000000000000013 /* ProjectLibrary.swift */,
 				A10000000000000000000003 /* Project.swift */,
 				A10000000000000000000004 /* Voicebank.swift */,
@@ -145,6 +148,7 @@
 				B20000000000000000000010 /* PianoKeyboard.swift in Sources */,
 				B20000000000000000000012 /* ProjectWorkspace.swift in Sources */,
 				B20000000000000000000013 /* StudioTheme.swift in Sources */,
+				B20000000000000000000014 /* TrackPanel.swift in Sources */,
 				B20000000000000000000011 /* ProjectLibrary.swift in Sources */,
 				B20000000000000000000003 /* Project.swift in Sources */,
 				B20000000000000000000004 /* Voicebank.swift in Sources */,

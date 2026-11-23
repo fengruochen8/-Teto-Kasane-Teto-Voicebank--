@@ -28,9 +28,7 @@ struct StudioView: View {
             controls
             editorTools
             noteInspector
-            PianoRoll(model: model, showsEntryCursor: keyboardExpanded && keyboardMode == .entry, tool: tool, snap: snap)
-                .frame(minHeight: 180)
-                .layoutPriority(1)
+            trackWorkspace.layoutPriority(1)
             PianoKeyboard(isExpanded: $keyboardExpanded, mode: $keyboardMode, location: model.entryLocation) { pitch in
                 if model.isPlaying { model.stop() }
                 if keyboardMode == .entry { model.enterNote(pitch: pitch) }
@@ -44,6 +42,29 @@ struct StudioView: View {
         .tint(StudioTheme.accent)
         .onChange(of: editingLyric) { _, editing in
             if !editing { model.finishLyricEdit() }
+        }
+    }
+
+    @ViewBuilder
+    private var trackWorkspace: some View {
+        if let track = model.activeTrack {
+            let roll = PianoRoll(
+                model: model, trackID: track.id, showsEntryCursor: keyboardExpanded && keyboardMode == .entry,
+                tool: tool, snap: snap
+            )
+            .id(track.id)
+            .frame(minHeight: 180)
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 12) {
+                    TrackPanel(model: model)
+                        .frame(width: 210)
+                    roll.frame(minWidth: 420)
+                }
+                VStack(spacing: 10) {
+                    TrackPanel(model: model, compact: true)
+                    roll
+                }
+            }
         }
     }
 

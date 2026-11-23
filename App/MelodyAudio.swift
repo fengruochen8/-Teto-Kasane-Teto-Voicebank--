@@ -5,13 +5,15 @@ enum MelodyAudio {
     static let sampleRate = 44_100
 
     static func render(_ project: MelodyProject, bank: Voicebank) throws -> Data {
-        guard !project.notes.isEmpty else { throw StudioError.emptyMelody }
+        guard project.noteCount > 0 else { throw StudioError.emptyMelody }
+        let notes = project.audibleTracks.flatMap(\.notes)
+        guard !notes.isEmpty else { throw StudioError.silencedMelody }
         let framesPerStep = Double(sampleRate * 60) / Double(project.tempo * MelodyProject.stepsPerBeat)
         let totalFrames = Int((framesPerStep * Double(MelodyProject.steps)).rounded())
         var output = [Float](repeating: 0, count: totalFrames)
         var recordings: [String: [Float]] = [:]
 
-        for note in project.notes.sorted(by: { $0.start < $1.start }) {
+        for note in notes.sorted(by: { $0.start < $1.start }) {
             let inputLyric = Voicebank.kana(note.lyric)
             let lyric = inputLyric.isEmpty ? "ら" : inputLyric
             guard let sample = bank.samples[lyric] else { throw StudioError.missingLyric(note.lyric) }

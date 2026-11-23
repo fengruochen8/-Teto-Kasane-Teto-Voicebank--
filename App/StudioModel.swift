@@ -11,6 +11,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var saveStatus: String?
     @Published private(set) var bank = StudioStorage.loadBank()
     @Published var selectedID: UUID?
+    @Published private(set) var activeTrackID: UUID?
     @Published private(set) var entryStep = 0
     @Published private(set) var transportStep = 0
     @Published private var undoHistory: [EditSnapshot] = []
@@ -33,6 +34,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private struct EditSnapshot {
         let project: MelodyProject
         let selectedID: UUID?
+        let activeTrackID: UUID?
         let entryStep: Int
     }
 
@@ -46,7 +48,11 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         return min(Double(MelodyProject.steps), max(0, player.currentTime / player.duration * Double(MelodyProject.steps)))
     }
 
-    var selected: MelodyNote? { project.notes.first { $0.id == selectedID } }
+    var activeTrack: MelodyTrack? {
+        project.tracks.first { $0.id == activeTrackID } ?? project.tracks.first
+    }
+
+    var selected: MelodyNote? { activeTrack?.notes.first { $0.id == selectedID } }
 
     func loadProjectLibrary() {
         guard !didLoadProjectLibrary else { return }
@@ -155,6 +161,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         invalidateAudio()
         previewPlayer?.stop()
         project = next.document.melody
+        activeTrackID = project.tracks.first?.id
         selectedID = nil
         entryStep = 0
         transportStep = 0
@@ -172,7 +179,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         let beat = entryStep % MelodyProject.stepsPerBar / MelodyProject.stepsPerBeat + 1
         let subdivision = entryStep % MelodyProject.stepsPerBeat
         let position = "第\(bar)小节 第\(beat)拍" + (subdivision == 0 ? "" : " +\(subdivision)/4拍")
-        let isInsideNote = project.notes.contains { $0.start < entryStep && entryStep < $0.end }
+        let isInsideNote = activeTrack?.notes.contains { $0.start < entryStep && entryStep < $0.end } ?? false
         return isInsideNote ? "\(position) · 音符内" : position
     }
 
@@ -191,6 +198,37 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
         duration * Double(transportStep) / Double(MelodyProject.steps)
     }
 
+    func selectTrack(_ id: UUID) {
+        guard activeTrack?.id != id, project.tracks.contains(where: { $0.id == id }) else { return }
+        finishLyricEdit()
+        activeTrackID = id
+        selectedID = nil
+    }
+
+    func addTrack() {
+        guard currentProject != nil, project.tracks.count < MelodyProject.maxTracks else { return }
+        let count = project.tracks.count
+        let track = MelodyTrack(name: count == 1 ? "和声" : "和声\(count)")
+        var updated = project
+        updated.tracks.append(track)
+        update(updated)
+        selectTrack(track.id)
+    }
+
+    func toggleMute(_ id: UUID) {
+        guard let index = project.tracks.firstIndex(where: { $0.id == id }) else { return }
+        var updated = project
+        updated.tracks[index].isMuted.toggle()
+        update(updated)
+    }
+
+    func toggleSolo(_ id: UUID) {
+        guard let index = project.tracks.firstIndex(where: { $0.id == id }) else { return }
+        var updated = project
+        updated.tracks[index].isSolo.toggle()
+        update(updated)
+    }
+
     func select(_ note: MelodyNote) {
         finishLyricEdit()
         selectedID = note.id
@@ -199,24 +237,25 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     func add(start: Int, pitch: Int) {
-        guard let note = project.newNote(at: start, pitch: pitch), place(note) else { return }
+        guard let note = activeTrack?.newNote(at: start, pitch: pitch), place(note) else { return }
         select(note)
     }
 
     func enterNote(pitch: Int) {
-        guard let note = project.noteForKeyboard(at: entryStep, pitch: pitch), place(note) else { return }
+        guard let note = activeTrack?.noteForKeyboard(at: entryStep, pitch: pitch), place(note) else { return }
         selectedID = note.id
         moveEntryCursor(to: note.end)
     }
 
     @discardableResult
     func place(_ note: MelodyNote, lyricEdit: UUID? = nil) -> Bool {
-        guard project.canPlace(note) else { return false }
+        guard let track = activeTrack, track.canPlace(note),
+              let index = project.tracks.firstIndex(where: { $0.id == track.id }) else { return false }
         var updated = project
-        if let index = updated.notes.firstIndex(where: { $0.id == note.id }) {
-            updated.notes[index] = note
+        if let noteIndex = track.notes.firstIndex(where: { $0.id == note.id }) {
+            updated.tracks[index].notes[noteIndex] = note
         } else {
-            updated.notes.append(note)
+            updated.tracks[index].notes.append(note)
         }
         update(updated, lyricEdit: lyricEdit)
         return true
@@ -233,9 +272,10 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     func deleteSelected() {
-        guard let selectedID else { return }
+        guard let selectedID, let track = activeTrack,
+              let index = project.tracks.firstIndex(where: { $0.id == track.id }) else { return }
         var updated = project
-        updated.notes.removeAll { $0.id == selectedID }
+        updated.tracks[index].notes.removeAll { $0.id == selectedID }
         update(updated)
         self.selectedID = nil
     }
@@ -247,7 +287,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     }
 
     private var editSnapshot: EditSnapshot {
-        EditSnapshot(project: project, selectedID: selectedID, entryStep: entryStep)
+        EditSnapshot(project: project, selectedID: selectedID, activeTrackID: activeTrack?.id, entryStep: entryStep)
     }
 
     func undo() {
@@ -265,6 +305,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     private func restore(_ snapshot: EditSnapshot) {
         finishLyricEdit()
         apply(snapshot.project)
+        activeTrackID = snapshot.activeTrackID ?? project.tracks.first?.id
         selectedID = snapshot.selectedID
         moveEntryCursor(to: snapshot.entryStep)
     }
