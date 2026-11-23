@@ -30,6 +30,8 @@ private struct WaveDocument: FileDocument {
 @MainActor
 struct StudioView: View {
     @StateObject private var model = StudioModel()
+    @State private var keyboardExpanded = false
+    @State private var keyboardMode = PianoKeyboardMode.audition
     @State private var showImporter = false
     @State private var showExporter = false
     @State private var exportDocument: WaveDocument?
@@ -39,9 +41,14 @@ struct StudioView: View {
             header
             controls
             noteInspector
-            PianoRoll(model: model)
-                .frame(minHeight: 250)
+            PianoRoll(model: model, showsEntryCursor: keyboardExpanded && keyboardMode == .entry)
+                .frame(minHeight: 180)
                 .layoutPriority(1)
+            PianoKeyboard(isExpanded: $keyboardExpanded, mode: $keyboardMode, location: model.entryLocation) { pitch in
+                if model.isPlaying { model.stop() }
+                if keyboardMode == .entry { model.enterNote(pitch: pitch) }
+                model.audition(pitch: pitch)
+            }
         }
         .padding(18)
         .foregroundStyle(Color.white)

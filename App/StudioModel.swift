@@ -7,6 +7,7 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
     @Published private(set) var project = StudioStorage.loadProject()
     @Published private(set) var bank = StudioStorage.loadBank()
     @Published var selectedID: UUID?
+    @Published private(set) var entryStep = 0
     @Published var errorMessage: String?
     @Published private(set) var isImporting = false
     @Published private(set) var isRendering = false
@@ -21,16 +22,35 @@ final class StudioModel: NSObject, ObservableObject, AVAudioPlayerDelegate {
 
     var selected: MelodyNote? { project.notes.first { $0.id == selectedID } }
 
+    var entryLocation: String {
+        guard entryStep < MelodyProject.steps else { return "已到曲尾" }
+        let bar = entryStep / MelodyProject.stepsPerBar + 1
+        let beat = entryStep % MelodyProject.stepsPerBar / MelodyProject.stepsPerBeat + 1
+        let subdivision = entryStep % MelodyProject.stepsPerBeat
+        let position = "第\(bar)小节 第\(beat)拍" + (subdivision == 0 ? "" : " +\(subdivision)/4拍")
+        let isInsideNote = project.notes.contains { $0.start < entryStep && entryStep < $0.end }
+        return isInsideNote ? "\(position) · 音符内" : position
+    }
+
+    func moveEntryCursor(to step: Int) {
+        entryStep = min(MelodyProject.steps, max(0, step))
+    }
+
     func select(_ note: MelodyNote) {
         selectedID = note.id
+        moveEntryCursor(to: note.start)
         audition(pitch: note.pitch)
     }
 
     func add(start: Int, pitch: Int) {
-        let nextStart = project.notes.filter { $0.start >= start }.map(\.start).min() ?? MelodyProject.steps
-        let duration = min(MelodyProject.stepsPerBeat, nextStart - start)
-        let note = MelodyNote(start: start, length: duration, pitch: pitch)
-        if place(note) { select(note) }
+        guard let note = project.newNote(at: start, pitch: pitch), place(note) else { return }
+        select(note)
+    }
+
+    func enterNote(pitch: Int) {
+        guard let note = project.noteForKeyboard(at: entryStep, pitch: pitch), place(note) else { return }
+        selectedID = note.id
+        moveEntryCursor(to: note.end)
     }
 
     @discardableResult

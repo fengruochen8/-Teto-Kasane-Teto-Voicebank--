@@ -25,6 +25,21 @@ struct MelodyProject: Codable, Equatable, Sendable {
             !notes.contains { $0.id != note.id && $0.start < note.end && note.start < $0.end }
     }
 
+    func newNote(at step: Int, pitch: Int) -> MelodyNote? {
+        guard (0..<Self.steps).contains(step) else { return nil }
+        let nextStart = notes.lazy.map(\.start).filter { $0 >= step }.min() ?? Self.steps
+        let note = MelodyNote(start: step, length: min(Self.stepsPerBeat, nextStart - step), pitch: pitch)
+        return canPlace(note) ? note : nil
+    }
+
+    func noteForKeyboard(at step: Int, pitch: Int) -> MelodyNote? {
+        if var note = notes.first(where: { $0.start == step }) {
+            note.pitch = pitch
+            return canPlace(note) ? note : nil
+        }
+        return newNote(at: step, pitch: pitch)
+    }
+
     private static func isInGrid(_ note: MelodyNote) -> Bool {
         note.start >= 0 && note.start < Self.steps &&
             note.length > 0 && note.length <= Self.steps - note.start &&

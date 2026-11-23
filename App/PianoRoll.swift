@@ -3,6 +3,7 @@ import SwiftUI
 @MainActor
 struct PianoRoll: View {
     @ObservedObject var model: StudioModel
+    let showsEntryCursor: Bool
     @State private var drag: NoteDrag?
 
     static let accent = Color(red: 0.98, green: 0.68, blue: 0.42)
@@ -14,6 +15,7 @@ struct PianoRoll: View {
             Canvas { context, _ in
                 drawGrid(context, layout: layout)
                 drawNotes(context, layout: layout)
+                if showsEntryCursor { drawEntryCursor(context, layout: layout) }
             }
             .background(Color(red: 0.09, green: 0.14, blue: 0.19))
             .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -23,7 +25,7 @@ struct PianoRoll: View {
                 .onEnded { _ in commitDrag() })
             .simultaneousGesture(SpatialTapGesture().onEnded { tap($0.location, layout: layout) })
             .accessibilityLabel("4小节旋律网格")
-            .accessibilityHint("点按添加音符，拖动移动音符")
+            .accessibilityHint(showsEntryCursor ? "点时间尺移动录入光标" : "点按添加音符，拖动移动音符")
         }
     }
 
@@ -92,13 +94,34 @@ struct PianoRoll: View {
         }
     }
 
+    private func drawEntryCursor(_ context: GraphicsContext, layout: RollLayout) {
+        let x = min(layout.size.width - 1, layout.x(model.entryStep))
+        context.stroke(Path { line in
+            line.move(to: CGPoint(x: x, y: layout.header))
+            line.addLine(to: CGPoint(x: x, y: layout.size.height))
+        }, with: .color(Self.accent), lineWidth: 1.5)
+        context.fill(Path { marker in
+            marker.move(to: CGPoint(x: x - 5, y: layout.header - 6))
+            marker.addLine(to: CGPoint(x: x + 5, y: layout.header - 6))
+            marker.addLine(to: CGPoint(x: x, y: layout.header))
+            marker.closeSubpath()
+        }, with: .color(Self.accent))
+    }
+
     private func hit(_ point: CGPoint, layout: RollLayout) -> MelodyNote? {
         model.project.notes.first { layout.rect($0).insetBy(dx: -1, dy: -1).contains(point) }
     }
 
     private func tap(_ point: CGPoint, layout: RollLayout) {
-        guard drag == nil, point.y >= layout.header,
+        guard drag == nil, point.y >= 0,
               point.y < layout.size.height, point.x >= 0, point.x < layout.size.width else { return }
+        if point.y < layout.header {
+            if showsEntryCursor, point.x >= layout.keys {
+                let step = Int((point.x - layout.keys) / layout.step)
+                model.moveEntryCursor(to: step)
+            }
+            return
+        }
         if let note = hit(point, layout: layout) {
             model.select(note)
         } else {
